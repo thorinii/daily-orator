@@ -4,10 +4,12 @@ const { promisify } = require('util')
 
 const express = require('express')
 const bodyParser = require('body-parser')
+const request = require('request')
 
 
 const historyFile = path.join(__dirname, 'data', 'history.json')
 const defaultUsername = 'lachlan'
+const apiKey = process.env.API_KEY
 
 const estimatedAnnualReadingDays = Math.floor(365.25 / 7 * 5)
 
@@ -243,8 +245,21 @@ function startServer () {
   })
 
   app.get('/chapter-audio', (req, res) => {
-    console.log('getting chapter', req.query.q)
-    res.sendFile(path.join('/home/lachlan', 'audio.mp3'))
+    const passage = (req.query.q || '').trim()
+    if (!/[a-zA-Z0-9 ]+ [0-9]+/.test(passage)) {
+      res.status(404)
+      return
+    }
+
+    console.log('getting chapter', passage)
+    const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(passage)}`
+
+    request({
+      url,
+      headers: {
+        'Authorization': 'Token ' + apiKey
+      }
+    }).pipe(res);
   })
 
   app.post('/record-history', (req, res) => {
