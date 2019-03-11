@@ -2,6 +2,10 @@ const fs = require('fs')
 const path = require('path')
 const { promisify } = require('util')
 
+const express = require('express')
+const bodyParser = require('body-parser')
+
+
 const historyFile = path.join(__dirname, 'data', 'history.json')
 const defaultUsername = 'lachlan'
 
@@ -140,7 +144,123 @@ loadHistory(defaultUsername)
       })
     })
     console.log(getPlaylist())
+
+    startServer()
   })
+
+
+//
+// web server
+//
+
+function startServer () {
+  const app = express()
+  app.use(bodyParser.json())
+  app.use(bodyParser.urlencoded({ extended: true }))
+
+  app.get('/', (req, res) => {
+    const playlist = getPlaylist()
+
+    const entriesJson = JSON.stringify(playlist)
+    const agendaHtml = playlist
+      .map((entry, idx) => {
+        return `
+        <div id='entry-${idx}'>${entry.list} - ${entry.chapter}</div>`
+      })
+      .join('\n')
+
+    res.send(`
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body>
+    <div>
+      <div id="currently-playing" style="text-align: center; margin-bottom: 12px; font-size: 2em"></div>
+      <audio controls style='width: 100%'></audio>
+
+      <div style="text-align: center; margin-top: 12px; font-size: 1em">${agendaHtml}</div>
+    </div>
+
+    <script>
+      var entries = ${entriesJson},
+        mediaElement,
+        currentlyPlayingEl = document.querySelector('#currently-playing'),
+        currentItem = 0;
+
+      function createVideo () {
+        mediaElement = document.querySelector('audio')
+        mediaElement.addEventListener('ended', endedListener);
+      }
+
+      function applySrc (entry) {
+        currentlyPlayingEl.innerText = entry.list + ' - ' + entry.chapter
+        mediaElement.src = 'chapter-audio?q=' + encodeURIComponent(entry.chapter)
+        mediaElement.load(); // important on iOS
+
+        try {
+          mediaElement.play()
+        } catch (e) {
+          console.log('cannot autoplay', e)
+        }
+      }
+
+      function changeVideo (itemId) {
+        applySrc(entries[itemId])
+
+        for (var i = 0; i < entries.length; i++) {
+          var el = document.querySelector('#entry-' + i)
+
+          var color
+          var bold = false
+
+          if (i < itemId) color = '#aaa'
+          else if (i === itemId) { color = '#111'; bold = true }
+          else color = '#444'
+
+          el.style.color = color
+          el.style.fontWeight = bold ? 'bold' : 'initial'
+        }
+      }
+
+      function endedListener (evt) {
+        // TODO: report finished chapter
+        var entry = entries[currentItem]
+        fetch('record-history?list=' + encodeURIComponent(entry.list) + '&chapter=' + encodeURIComponent(entry.chapter), { method: 'POST' })
+          .then(() => console.log('recorded'), e => console.warn('failed to record', e))
+
+        currentItem++;
+        if (currentItem >= entries.length) return
+        changeVideo(currentItem);
+      }
+
+      createVideo()
+      changeVideo(0)
+    </script>
+  </body>
+</html>`)
+  })
+
+  app.get('/chapter-audio', (req, res) => {
+    console.log('getting chapter', req.query.q)
+    res.sendFile(path.join('/home/lachlan', 'audio.mp3'))
+  })
+
+  app.post('/record-history', (req, res) => {
+    appendHistoryRecord(defaultUsername, req.query.list, req.query.chapter)
+    res.send('')
+  })
+
+  app.use((err, req, res, next) => {
+    console.error(err)
+    res.status(500).json({ error: err })
+  })
+
+  app.listen(3000, function () {
+    console.log('Started Horner Bible audio system on port 3000')
+  })
+}
 
 
 //
@@ -233,7 +353,10 @@ function getPlaylist () {
   for (let i = 0; i < lists.length; i++) {
     if (idx >= lists.length) idx = 0
 
-    chapters.push(getNextChapterByPlace(lists[idx].name))
+    chapters.push({
+      list: lists[idx].name,
+      chapter: getNextChapterByPlace(lists[idx].name)
+    })
 
     idx++
   }

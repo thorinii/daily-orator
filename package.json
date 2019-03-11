@@ -1,0 +1,13 @@
+{
+  "name": "bible-horner-system",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Lachlan Phillips <flipsidelachy@gmail.com>",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "axios": "^0.18.0",
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4"
+  }
+}
