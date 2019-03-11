@@ -1,4 +1,12 @@
+const fs = require('fs')
+const path = require('path')
+const { promisify } = require('util')
+
+const historyFile = path.join(__dirname, 'data', 'history.json')
+const defaultUsername = 'lachlan'
+
 const estimatedAnnualReadingDays = Math.floor(365.25 / 7 * 5)
+
 
 const bookChapterCounts = {
   "Genesis": 50,
@@ -93,6 +101,10 @@ const rawLists = {
 }
 
 
+//
+// core data structures
+//
+
 const lists = Object.keys(rawLists).map(name => {
   const books = rawLists[name]
   const chapterSequence = [].concat(...books.map(b => {
@@ -108,34 +120,76 @@ const lists = Object.keys(rawLists).map(name => {
   }
 })
 
-const state = lists.map(l => ({ name: l.name, index: 0, playSequenceClock: null }))
-
-const history = [
-  ['Gospels, Revelation', 'Mark 3'],
-  ['Pentateuch', 'Genesis 31'],
-  ['Lesser Wisdom', 'Job 31'],
-  ['NT letters 1', 'Galatians 1'],
-  ['Psalms', 'Psalms 31'],
-  ['OT history', 'Judges 7'],
-  ['Acts, Romans, Hebrews', 'Acts 2'],
-  ['OT prophets', 'Isaiah 31'],
-  ['Proverbs', 'Proverbs 30'],
-  ['NT letters 2', '2 Thessalonians 3'],
-]
-
-history.forEach(h => updatePlaceToChapter(h[0], h[1]))
+const state = lists.map(l => ({ name: l.name, index: -1, playSequenceClock: null }))
 
 
-lists.forEach((l, idx) => {
-  console.log({
-    name: l.name,
-    length: l.chapterCount,
-    next: getChapterByPlace(l.name),
-    psc: state.find(p => p.name === l.name).playSequenceClock
+//
+// startup logic
+//
+
+loadHistory(defaultUsername)
+  .then(entries => {
+    entries.forEach(e => updatePlaceToChapter(e.listName, e.chapter))
+
+    lists.forEach((l, idx) => {
+      console.log({
+        name: l.name,
+        length: l.chapterCount,
+        next: getNextChapterByPlace(l.name),
+        psc: state.find(p => p.name === l.name).playSequenceClock
+      })
+    })
+    console.log(getPlaylist())
   })
-})
-console.log(getPlaylist())
 
+
+//
+// history functions
+//
+
+function appendHistoryRecord (username, listName, chapter) {
+  const entry = JSON.stringify([username, listName, chapter, new Date().toISOString()])
+  promisify(fs.appendFile)(historyFile, entry + '\n')
+    .then(() => {
+      console.log('recorded chapter %s of list %s', chapter, listName)
+      updatePlaceToChapter(listName, chapter)
+    })
+    .then(null, e => {
+      console.warn('failed to record %s %s:', listName, chapter, e)
+      setTimeout(() => process.exit(1), 500)
+    })
+}
+
+function loadHistory (username) {
+  return promisify(fs.readFile)(historyFile, 'utf8')
+    .then(data => {
+      return data.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+        .map(line => {
+          const json = JSON.parse(line)
+          return {
+            username: json[0],
+            listName: json[1],
+            chapter: json[2],
+            timestamp: json[3]
+          }
+        })
+        .filter(entry => entry.username === username)
+    })
+    .then(null, e => {
+      if (e.code === 'ENOENT') return []
+
+      console.warn('failed to load history for user %s:', username, e)
+      setTimeout(() => process.exit(1), 500)
+      return []
+    })
+}
+
+
+//
+// state functions
+//
 
 function updatePlaceToCount (listName, count) {
   const list = lists.find(l => l.name === listName)
@@ -162,10 +216,10 @@ function incrementNextPlace (listName) {
 }
 
 
-function getChapterByPlace (listName) {
+function getNextChapterByPlace (listName) {
   const list = lists.find(l => l.name === listName)
   const place = state.find(p => p.name === listName)
-  return list.chapterSequence[(place.index) % list.chapterCount]
+  return list.chapterSequence[(place.index + 1) % list.chapterCount]
 }
 
 function nextPlaySequenceClock () {
@@ -179,13 +233,17 @@ function getPlaylist () {
   for (let i = 0; i < lists.length; i++) {
     if (idx >= lists.length) idx = 0
 
-    chapters.push(getChapterByPlace(lists[idx].name))
+    chapters.push(getNextChapterByPlace(lists[idx].name))
 
     idx++
   }
   return chapters
 }
 
+
+//
+// helpers
+//
 
 function rangeUntil (count) {
   const array = []
@@ -203,7 +261,7 @@ function indexOfMax (list, fn) {
   let index = 0
   let max = -Infinity
   list.forEach((item, idx) => {
-    const value = fn(item)
+    const value = fn(item) || 0
     if (max < value) {
       max = value
       index = idx
