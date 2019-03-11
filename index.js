@@ -108,33 +108,40 @@ const lists = Object.keys(rawLists).map(name => {
   }
 })
 
-const state = lists.map(l => ({ name: l.name, index: 0 }))
+const state = lists.map(l => ({ name: l.name, index: 0, playSequenceClock: null }))
 
-updatePlaceToChapter('Gospels, Revelation', 'Mark 3')
-updatePlaceToChapter('Pentateuch', 'Genesis 31')
-updatePlaceToChapter('Lesser Wisdom', 'Job 31')
-updatePlaceToChapter('NT letters 1', 'Galatians 1')
-updatePlaceToChapter('Psalms', 'Psalms 31')
-updatePlaceToChapter('OT history', 'Judges 7')
-updatePlaceToChapter('Acts, Romans, Hebrews', 'Acts 2')
-updatePlaceToChapter('OT prophets', 'Isaiah 31')
-updatePlaceToChapter('Proverbs', 'Proverbs 30')
-updatePlaceToChapter('NT letters 2', '2 Thessalonians 3')
+const history = [
+  ['Gospels, Revelation', 'Mark 3'],
+  ['Pentateuch', 'Genesis 31'],
+  ['Lesser Wisdom', 'Job 31'],
+  ['NT letters 1', 'Galatians 1'],
+  ['Psalms', 'Psalms 31'],
+  ['OT history', 'Judges 7'],
+  ['Acts, Romans, Hebrews', 'Acts 2'],
+  ['OT prophets', 'Isaiah 31'],
+  ['Proverbs', 'Proverbs 30'],
+  ['NT letters 2', '2 Thessalonians 3'],
+]
+
+history.forEach(h => updatePlaceToChapter(h[0], h[1]))
 
 
 lists.forEach((l, idx) => {
   console.log({
     name: l.name,
     length: l.chapterCount,
-    next: getChapterByPlace(l.name)
+    next: getChapterByPlace(l.name),
+    psc: state.find(p => p.name === l.name).playSequenceClock
   })
 })
+console.log(getPlaylist())
 
 
 function updatePlaceToCount (listName, count) {
   const list = lists.find(l => l.name === listName)
   const place = state.find(p => p.name === listName)
   place.index = count % list.chapterCount
+  place.playSequenceClock = nextPlaySequenceClock()
 }
 
 function updatePlaceToChapter (listName, chapter) {
@@ -143,6 +150,7 @@ function updatePlaceToChapter (listName, chapter) {
   const chapterIndex = list.chapterSequence.indexOf(chapter)
   if (chapterIndex >= 0) place.index = chapterIndex
   else throw new Error('Unknown chapter ' + chapter + ' for list ' + listName)
+  place.playSequenceClock = nextPlaySequenceClock()
 }
 
 function incrementNextPlace (listName) {
@@ -150,6 +158,7 @@ function incrementNextPlace (listName) {
   const place = state.find(p => p.name === listName)
   place.index++
   if (place.index >= list.chapterCount) place.index = 0
+  place.playSequenceClock = nextPlaySequenceClock()
 }
 
 
@@ -157,6 +166,24 @@ function getChapterByPlace (listName) {
   const list = lists.find(l => l.name === listName)
   const place = state.find(p => p.name === listName)
   return list.chapterSequence[(place.index) % list.chapterCount]
+}
+
+function nextPlaySequenceClock () {
+  return Math.max(-1, ...state.map(p => p.playSequenceClock).filter(p => p !== null)) + 1
+}
+
+function getPlaylist () {
+  let idx = indexOfMax(state, p => p.playSequenceClock) + 1;
+
+  const chapters = []
+  for (let i = 0; i < lists.length; i++) {
+    if (idx >= lists.length) idx = 0
+
+    chapters.push(getChapterByPlace(lists[idx].name))
+
+    idx++
+  }
+  return chapters
 }
 
 
@@ -170,4 +197,17 @@ function rangeUntil (count) {
 
 function toD1 (n) {
   return Math.round(n * 10) / 10
+}
+
+function indexOfMax (list, fn) {
+  let index = 0
+  let max = -Infinity
+  list.forEach((item, idx) => {
+    const value = fn(item)
+    if (max < value) {
+      max = value
+      index = idx
+    }
+  })
+  return index
 }
