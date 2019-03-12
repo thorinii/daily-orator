@@ -174,6 +174,8 @@ function startServer () {
       })
       .join('\n')
 
+    preloadAudios(playlist.map(p => p.chapter))
+
     res.send(`
 <!doctype html>
 <html>
@@ -257,14 +259,7 @@ function startServer () {
     console.log('GET chapter', passage)
     const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(passage)}`
 
-    downloadChapterAudio(passage)
-      .then(file => {
-        const refFile = file.replace('.mp3', '_ref.mp3')
-        const mp4File = file.replace('.mp3', '.mp4')
-        return skipIfExists(mp4File,
-          () => sayReference(passage, refFile)
-            .then(() => transcodeAudioToVideo([refFile, file], mp4File)))
-      })
+    downloadAndProcessAudio(passage)
       .then(file => res.sendFile(file, { acceptRanges: false }))
       .then(null, e => next(e))
   })
@@ -288,6 +283,41 @@ function startServer () {
 //
 // ESV API functions
 //
+
+const preloadQueue = []
+let preloadGoing = false
+function preloadAudios (passages) {
+  passages.forEach(p => preloadQueue.push(p))
+
+  function pumpOne () {
+    if (passages.length === 0) {
+      preloadGoing = false
+      return
+    }
+
+    preloadGoing = true
+
+    const next = passages.shift()
+    downloadAndProcessAudio(next)
+      .catch(e => console.warn('Error in preload of chapter:', chapter, e))
+      .then(() => pumpOne())
+  }
+
+  if (!preloadGoing) {
+    pumpOne()
+  }
+}
+
+function downloadAndProcessAudio (passage) {
+  return downloadChapterAudio(passage)
+    .then(file => {
+      const refFile = file.replace('.mp3', '_ref.wav')
+      const mp4File = file.replace('.mp3', '.mp4')
+      return skipIfExists(mp4File,
+        () => sayReference(passage, refFile)
+          .then(() => transcodeAudioToVideo([refFile, file], mp4File)))
+    })
+}
 
 function downloadChapterAudio (chapter) {
   const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(chapter)}`
