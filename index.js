@@ -7,7 +7,9 @@ const bodyParser = require('body-parser')
 const request = require('request')
 
 
-const historyFile = path.join(__dirname, 'data', 'history.json')
+const dataDirectory = path.join(__dirname, 'data')
+const historyFile = path.join(dataDirectory, 'history.json')
+const audioCacheDirectory = path.join(dataDirectory, 'audio')
 const defaultUsername = 'lachlan'
 const apiKey = process.env.API_KEY
 
@@ -244,7 +246,7 @@ function startServer () {
 </html>`)
   })
 
-  app.get('/chapter-audio', (req, res) => {
+  app.get('/chapter-audio', (req, res, next) => {
     const passage = (req.query.q || '').trim()
     if (!/[a-zA-Z0-9 ]+ [0-9]+/.test(passage)) {
       res.status(404)
@@ -254,12 +256,9 @@ function startServer () {
     console.log('getting chapter', passage)
     const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(passage)}`
 
-    request({
-      url,
-      headers: {
-        'Authorization': 'Token ' + apiKey
-      }
-    }).pipe(res);
+    downloadChapterAudio(passage)
+      .then(file => res.sendFile(file))
+      .then(null, e => next(e))
   })
 
   app.post('/record-history', (req, res) => {
@@ -275,6 +274,40 @@ function startServer () {
   app.listen(3000, function () {
     console.log('Started Horner Bible audio system on port 3000')
   })
+}
+
+
+//
+// ESV API functions
+//
+
+function downloadChapterAudio (chapter) {
+  const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(chapter)}`
+  const chapterId = chapter.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+
+  const chapterFile = path.join(audioCacheDirectory, chapterId) + '.mp3'
+
+  return promisify(fs.mkdir)(audioCacheDirectory)
+    .catch(() => null)
+    .then(() => promisify(fs.exists)(chapterFile))
+    .then(exists => {
+      if (exists) return chapterFile
+
+
+      const stream = fs.createWriteStream(chapterFile)
+
+      return new Promise((resolve, reject) => {
+        request({
+          url,
+          headers: {
+            'Authorization': 'Token ' + apiKey
+          }
+        })
+          .pipe(stream)
+          .on('close', () => resolve(chapterFile))
+          .on('error', e => reject(e));
+      })
+    })
 }
 
 
