@@ -180,7 +180,7 @@ function startServer () {
   <body>
     <div>
       <div id="currently-playing" style="text-align: center; margin-bottom: 12px; font-size: 2em"></div>
-      <audio controls style='width: 100%'></audio>
+      <video controls style='width: 100%'></video>
 
       <div style="text-align: center; margin-top: 12px; font-size: 1em">${agendaHtml}</div>
     </div>
@@ -192,7 +192,7 @@ function startServer () {
         currentItem = 0;
 
       function createVideo () {
-        mediaElement = document.querySelector('audio')
+        mediaElement = document.querySelector('video')
         mediaElement.addEventListener('ended', endedListener);
       }
 
