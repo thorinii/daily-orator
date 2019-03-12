@@ -1,3 +1,4 @@
+const childProcess = require('child_process')
 const fs = require('fs')
 const path = require('path')
 const { promisify } = require('util')
@@ -200,7 +201,7 @@ function startServer () {
 
       function applySrc (entry) {
         currentlyPlayingEl.innerText = entry.list + ' - ' + entry.chapter
-        mediaElement.src = 'chapter-audio?q=' + encodeURIComponent(entry.chapter)
+        mediaElement.src = 'chapter-audio?q=' + encodeURIComponent(entry.chapter) + '&x=' + Math.random()
         mediaElement.load(); // important on iOS
 
         try {
@@ -253,10 +254,11 @@ function startServer () {
       return
     }
 
-    console.log('getting chapter', passage)
+    console.log('GET chapter', passage)
     const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(passage)}`
 
     downloadChapterAudio(passage)
+      .then(file => transcodeAudioToVideo([file], file.replace('mp3', 'mp4')))
       .then(file => res.sendFile(file))
       .then(null, e => next(e))
   })
@@ -294,6 +296,7 @@ function downloadChapterAudio (chapter) {
       if (exists) return chapterFile
 
 
+      console.log('getting chapter from ESV', chapter)
       const stream = fs.createWriteStream(chapterFile)
 
       return new Promise((resolve, reject) => {
@@ -308,6 +311,20 @@ function downloadChapterAudio (chapter) {
           .on('error', e => reject(e));
       })
     })
+}
+
+function transcodeAudioToVideo (files, outFile) {
+  // ffmpeg -i data/audio/galatians_1_ref.mp3 -i data/audio/galatians_1.mp3 -filter_complex "[0:0][1:0]concat=n=2:v=0:a=1[out]" -map "[out]" data/audio/galatians_1.mp4
+
+  const concatConfig = files.map((f, idx) => `[${idx}:0]`).join('')
+    + `concat=n=${files.length}:v=0:a=1[out]`
+  const cmd = [
+    '-y',
+    ...[].concat(...files.map(f => ['-i', f])),
+    '-filter_complex', concatConfig, '-map', '[out]',
+    outFile]
+  return promisify(childProcess.execFile)('ffmpeg', cmd)
+    .then(() => outFile)
 }
 
 
