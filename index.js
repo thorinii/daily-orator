@@ -174,7 +174,11 @@ function startServer () {
       })
       .join('\n')
 
-    preloadAudios(playlist.map(p => p.chapter))
+    // the loader doesn't work with multiple request for the same file at once,
+    // and the player typically loads the first one in the playlist at the
+    // same time as the preloader, so we skip the first one and preload the
+    // rest.
+    preloadAudios(playlist.map(p => p.chapter).slice(1))
 
     res.send(`
 <!doctype html>
@@ -312,10 +316,10 @@ function downloadAndProcessAudio (passage) {
   return downloadChapterAudio(passage)
     .then(file => {
       const refFile = file.replace('.mp3', '_ref.wav')
-      const mp4File = file.replace('.mp3', '.mp4')
-      return skipIfExists(mp4File,
+      const videoFile = file.replace('.mp3', '.webm')
+      return skipIfExists(videoFile,
         () => sayReference(passage, refFile)
-          .then(() => transcodeAudioToVideo([refFile, file], mp4File)))
+          .then(() => transcodeAudioToVideo([refFile, file], videoFile)))
     })
 }
 
@@ -333,31 +337,43 @@ function downloadChapterAudio (chapter) {
 
 
       console.log('getting chapter from ESV:', chapter)
-      const stream = fs.createWriteStream(chapterFile)
 
       return new Promise((resolve, reject) => {
         request({
           url,
           headers: {
             'Authorization': 'Token ' + apiKey
-          }
+          },
+          encoding: null
         })
-          .pipe(stream)
-          .on('close', () => resolve(chapterFile))
+          .pipe(fs.createWriteStream(chapterFile))
+          .on('close', () => resolve())
           .on('error', e => reject(e));
       })
     })
+    .then(() => chapterFile)
 }
 
 function transcodeAudioToVideo (files, outFile) {
+  const tmpFile = outFile.replace('.', '_tmp.')
   const concatConfig = files.map((f, idx) => `[${idx}:0]`).join('')
     + `concat=n=${files.length}:v=0:a=1[out]`
-  const cmd = [
+  const cmd1 = [
     '-y',
     ...[].concat(...files.map(f => ['-i', f])),
     '-filter_complex', concatConfig, '-map', '[out]',
+    tmpFile]
+
+  const cmd2 = [
+    '-y',
+    '-i', tmpFile,
+    '-f', 'lavfi', '-i', 'color=c=black:s=720x406:r=25:sar=1/1:d=13',
+    '-c:a', 'copy',
     outFile]
-  return promisify(childProcess.execFile)('ffmpeg', cmd)
+
+  return promisify(childProcess.execFile)('ffmpeg', cmd1)
+    .then(() => promisify(childProcess.execFile)('ffmpeg', cmd2))
+    .then(() => console.log('transcoded to', outFile))
     .then(() => outFile)
 }
 
