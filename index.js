@@ -183,7 +183,7 @@ function startServer () {
   <body>
     <div>
       <div id="currently-playing" style="text-align: center; margin-bottom: 12px; font-size: 2em"></div>
-      <video controls style='width: 100%'></video>
+      <video controls style='width: 100%; height: 100px'></video>
 
       <div style="text-align: center; margin-top: 12px; font-size: 1em">${agendaHtml}</div>
     </div>
@@ -260,8 +260,10 @@ function startServer () {
     downloadChapterAudio(passage)
       .then(file => {
         const refFile = file.replace('.mp3', '_ref.mp3')
-        return sayReference(passage, refFile)
-          .then(() => transcodeAudioToVideo([refFile, file], file.replace('mp3', 'mp4')))
+        const mp4File = file.replace('.mp3', '.mp4')
+        return skipIfExists(mp4File,
+          () => sayReference(passage, refFile)
+            .then(() => transcodeAudioToVideo([refFile, file], mp4File)))
       })
       .then(file => res.sendFile(file, { acceptRanges: false }))
       .then(null, e => next(e))
@@ -300,7 +302,7 @@ function downloadChapterAudio (chapter) {
       if (exists) return chapterFile
 
 
-      console.log('getting chapter from ESV', chapter)
+      console.log('getting chapter from ESV:', chapter)
       const stream = fs.createWriteStream(chapterFile)
 
       return new Promise((resolve, reject) => {
@@ -330,6 +332,7 @@ function transcodeAudioToVideo (files, outFile) {
 }
 
 function sayReference (chapter, outFile) {
+  console.log('saying reference:', chapter)
   const cmd = [
     '-s', '130',
     '-p', '30',
@@ -337,6 +340,11 @@ function sayReference (chapter, outFile) {
     '-w', outFile]
   return promisify(childProcess.execFile)('espeak', cmd)
     .then(() => outFile)
+}
+
+function skipIfExists (file, fn) {
+  return promisify(fs.exists)(file)
+    .then(exists => exists ? file : fn())
 }
 
 
