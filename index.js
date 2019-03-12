@@ -258,8 +258,12 @@ function startServer () {
     const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(passage)}`
 
     downloadChapterAudio(passage)
-      .then(file => transcodeAudioToVideo([file], file.replace('mp3', 'mp4')))
-      .then(file => res.sendFile(file))
+      .then(file => {
+        const refFile = file.replace('.mp3', '_ref.mp3')
+        return sayReference(passage, refFile)
+          .then(() => transcodeAudioToVideo([refFile, file], file.replace('mp3', 'mp4')))
+      })
+      .then(file => res.sendFile(file, { acceptRanges: false }))
       .then(null, e => next(e))
   })
 
@@ -314,8 +318,6 @@ function downloadChapterAudio (chapter) {
 }
 
 function transcodeAudioToVideo (files, outFile) {
-  // ffmpeg -i data/audio/galatians_1_ref.mp3 -i data/audio/galatians_1.mp3 -filter_complex "[0:0][1:0]concat=n=2:v=0:a=1[out]" -map "[out]" data/audio/galatians_1.mp4
-
   const concatConfig = files.map((f, idx) => `[${idx}:0]`).join('')
     + `concat=n=${files.length}:v=0:a=1[out]`
   const cmd = [
@@ -324,6 +326,16 @@ function transcodeAudioToVideo (files, outFile) {
     '-filter_complex', concatConfig, '-map', '[out]',
     outFile]
   return promisify(childProcess.execFile)('ffmpeg', cmd)
+    .then(() => outFile)
+}
+
+function sayReference (chapter, outFile) {
+  const cmd = [
+    '-s', '130',
+    '-p', '30',
+    chapter,
+    '-w', outFile]
+  return promisify(childProcess.execFile)('espeak', cmd)
     .then(() => outFile)
 }
 
