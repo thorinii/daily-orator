@@ -13,6 +13,7 @@ const historyFile = path.join(dataDirectory, 'history.json')
 const audioCacheDirectory = path.join(dataDirectory, 'audio')
 const defaultUsername = 'lachlan'
 const apiKey = process.env.API_KEY
+const sweepAgeDays = process.env.SWEEP_AGE_DAYS || 2
 
 const estimatedAnnualReadingDays = Math.floor(365.25 / 7 * 5)
 
@@ -281,6 +282,9 @@ function startServer () {
   app.listen(3000, function () {
     console.log('Started Horner Bible audio system on port 3000')
   })
+
+  sweepOldAudio()
+    .then(null, e => console.warn('Error in sweeping:', e))
 }
 
 
@@ -292,6 +296,9 @@ const preloadQueue = []
 let preloadGoing = false
 function preloadAudios (passages) {
   passages.forEach(p => preloadQueue.push(p))
+
+  sweepOldAudio()
+    .then(null, e => console.warn('Error in sweeping:', e))
 
   function pumpOne () {
     if (passages.length === 0) {
@@ -391,6 +398,32 @@ function sayReference (chapter, outFile) {
 function skipIfExists (file, fn) {
   return promisify(fs.exists)(file)
     .then(exists => exists ? file : fn())
+}
+
+
+function sweepOldAudio () {
+  const minKeepMs = 1 * 60 * 60 * 1000 // for sanity, keep for at least an hour
+  const sweepAgeMs = Math.max(sweepAgeDays * 24 * 60 * 60 * 1000, minKeepMs)
+  const now = Date.now()
+
+  return promisify(fs.readdir)(audioCacheDirectory)
+    .then(files => {
+      return Promise.all(files.map(f => {
+        const p = path.join(audioCacheDirectory, f)
+        return promisify(fs.stat)(p)
+          .then(stat => ({ file: p, stat }))
+      }))
+    })
+    .then(fileStats => {
+      return Promise.all(fileStats.map(f => {
+        const age = now - f.stat.mtimeMs
+        const shouldDelete = age > sweepAgeMs
+
+        console.log('deleting', path.basename(f.file))
+        if (shouldDelete) return promisify(fs.unlink)(f.file)
+        else return null
+      }))
+    })
 }
 
 
