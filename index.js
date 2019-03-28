@@ -88,26 +88,18 @@ const bookChapterCounts = {
 }
 
 const rawLists = {
-  "Gospels, Revelation":
-    ["Matthew", "Mark", "Luke", "John", "Revelation"],
-  "Pentateuch":
-    ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy"],
-  "Lesser Wisdom":
-    ["Job", "Ecclesiastes", "Song of Solomon", "Lamentations"],
-  "NT letters 1":
-    ["1 Corinthians", "2 Corinthians", "Galatians", "Ephesians", "1 Timothy", "2 Timothy"],
+  "NT history":
+    ["Matthew", "Mark", "Luke", "John", "Acts", "Revelation"],
   "Psalms":
     ["Psalms"],
   "OT history":
-    ["Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah", "Esther"],
-  "Acts, Romans, Hebrews":
-    ["Acts", "Romans", "Hebrews"],
-  "OT prophets":
-    ["Isaiah", "Jeremiah", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi"],
+    ["Genesis", "Job", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah", "Esther"],
   "Proverbs":
     ["Proverbs"],
-  "NT letters 2":
-    ["Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", "Titus", "Philemon", "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude"]
+  "OT prophets":
+    ["Ecclesiastes", "Song of Solomon", "Lamentations", "Isaiah", "Jeremiah", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi"],
+  "NT letters":
+    ["Romans", "Hebrews", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians", "1 Timothy", "2 Timothy", "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", "Titus", "Philemon", "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude"],
 }
 
 
@@ -492,6 +484,8 @@ function loadHistory (username) {
 function updatePlaceToCount (listName, count) {
   const list = lists.find(l => l.name === listName)
   const place = state.find(p => p.name === listName)
+  if (!list) throw new Error('Unknown list: ' + listName)
+
   place.index = count % list.chapterCount
   place.playSequenceClock = nextPlaySequenceClock()
 }
@@ -499,6 +493,8 @@ function updatePlaceToCount (listName, count) {
 function updatePlaceToChapter (listName, chapter) {
   const list = lists.find(l => l.name === listName)
   const place = state.find(p => p.name === listName)
+  if (!list) throw new Error('Unknown list: ' + listName)
+
   const chapterIndex = list.chapterSequence.indexOf(chapter)
   if (chapterIndex >= 0) place.index = chapterIndex
   else throw new Error('Unknown chapter ' + chapter + ' for list ' + listName)
@@ -508,6 +504,8 @@ function updatePlaceToChapter (listName, chapter) {
 function incrementNextPlace (listName) {
   const list = lists.find(l => l.name === listName)
   const place = state.find(p => p.name === listName)
+  if (!list) throw new Error('Unknown list: ' + listName)
+
   place.index++
   if (place.index >= list.chapterCount) place.index = 0
   place.playSequenceClock = nextPlaySequenceClock()
@@ -517,6 +515,8 @@ function incrementNextPlace (listName) {
 function getNextChapterByPlace (listName) {
   const list = lists.find(l => l.name === listName)
   const place = state.find(p => p.name === listName)
+  if (!list) throw new Error('Unknown list: ' + listName)
+
   return list.chapterSequence[(place.index + 1) % list.chapterCount]
 }
 
