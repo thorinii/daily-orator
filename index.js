@@ -118,7 +118,8 @@ const lists = Object.keys(rawLists).map(name => {
   const books = rawLists[name]
   const chapterSequence = [].concat(...books.map(b => {
     const bookLength = bookChapterCounts[b]
-    return rangeUntil(bookLength).map(i => b + ' ' + (i + 1))
+    if (bookLength === 1) return [b]
+    else return rangeUntil(bookLength).map(i => b + ' ' + (i + 1))
   }))
   return {
     name,
@@ -142,10 +143,9 @@ loadHistory(defaultUsername)
 
     lists.forEach((l, idx) => {
       console.log({
-        name: l.name,
-        length: l.chapterCount,
-        next: getNextChapterByPlace(l.name),
-        psc: state.find(p => p.name === l.name).playSequenceClock
+        l: l.chapterCount,
+        n: l.name,
+        next: getNextChapterByPlace(l.name)
       })
     })
     console.log(getPlaylist())
