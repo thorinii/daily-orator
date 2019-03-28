@@ -160,6 +160,12 @@ loadHistory(defaultUsername)
 //
 
 function startServer () {
+  if (!apiKey) {
+    console.log('API_KEY must be set')
+    return
+  }
+
+
   const app = express()
   app.use(bodyParser.json())
   app.use(bodyParser.urlencoded({ extended: true }))
@@ -175,11 +181,7 @@ function startServer () {
       })
       .join('\n')
 
-    // the loader doesn't work with multiple request for the same file at once,
-    // and the player typically loads the first one in the playlist at the
-    // same time as the preloader, so we skip the first one and preload the
-    // rest.
-    preloadAudios(playlist.map(p => p.chapter).slice(1))
+    preloadAudios(playlist.map(p => p.chapter))
 
     res.send(`
 <!doctype html>
@@ -261,7 +263,7 @@ function startServer () {
       return
     }
 
-    console.log('GET chapter', passage)
+    console.log('GET /chapter-audio?q=%s', passage)
     const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(passage)}`
 
     downloadAndProcessAudio(passage)
@@ -310,7 +312,7 @@ function preloadAudios (passages) {
 
     const next = passages.shift()
     downloadAndProcessAudio(next)
-      .catch(e => console.warn('Error in preload of chapter:', chapter, e))
+      .catch(e => console.warn('Error in preload of chapter:', next, e))
       .then(() => pumpOne())
   }
 
@@ -319,8 +321,12 @@ function preloadAudios (passages) {
   }
 }
 
+const downloadState = {}
 function downloadAndProcessAudio (passage) {
-  return downloadChapterAudio(passage)
+  const existingPromise = downloadState[passage]
+  if (existingPromise) return existingPromise
+
+  const p = downloadChapterAudio(passage)
     .then(file => {
       const refFile = file.replace('.mp3', '_ref.wav')
       const videoFile = file.replace('.mp3', '.webm')
@@ -328,6 +334,13 @@ function downloadAndProcessAudio (passage) {
         () => sayReference(passage, refFile)
           .then(() => transcodeAudioToVideo([refFile, file], videoFile)))
     })
+
+  downloadState[passage] = p
+  p.then(
+    () => { delete downloadState[passage] },
+    () => { delete downloadState[passage] })
+
+  return p
 }
 
 function downloadChapterAudio (chapter) {
@@ -419,9 +432,10 @@ function sweepOldAudio () {
         const age = now - f.stat.mtimeMs
         const shouldDelete = age > sweepAgeMs
 
-        console.log('deleting', path.basename(f.file))
-        if (shouldDelete) return promisify(fs.unlink)(f.file)
-        else return null
+        if (shouldDelete) {
+          console.log('deleting', path.basename(f.file), { age, sweepAgeMs })
+          return promisify(fs.unlink)(f.file)
+        } else return null
       }))
     })
 }
