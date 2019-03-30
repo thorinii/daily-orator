@@ -5,9 +5,20 @@
   "author": "Lachlan Phillips <flipsidelachy@gmail.com>",
   "license": "MIT",
   "private": true,
+  "scripts": {
+    "style:check": "eslint ."
+  },
   "dependencies": {
     "body-parser": "^1.18.3",
     "express": "^4.16.4",
     "request": "^2.88.0"
+  },
+  "devDependencies": {
+    "eslint": ">=5.0.0",
+    "eslint-config-standard": "^12.0.0",
+    "eslint-plugin-import": ">=2.13.0",
+    "eslint-plugin-node": ">=7.0.0",
+    "eslint-plugin-promise": ">=4.0.0",
+    "eslint-plugin-standard": ">=4.0.0"
   }
 }
