@@ -1,0 +1,17 @@
+{
+  "providers": {
+    "esv": {
+      "api_key": null
+    },
+
+    "file": {}
+  },
+
+  "lists": [
+    {
+      "name": "example gospels",
+      "provider": "esv",
+      "books": ["Matthew", "Mark", "Luke", "John"]
+    }
+  ]
+}
