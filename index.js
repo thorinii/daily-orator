@@ -4,6 +4,7 @@ const { promisify } = require('util')
 
 const express = require('express')
 const bodyParser = require('body-parser')
+const cron = require('node-cron')
 
 const esvProvider = require('./src/esv_provider.js')
 const fileProvider = require('./src/file_provider.js')
@@ -38,33 +39,34 @@ const providers = {
       }
     }))
 
-    const entries = await loadHistory(defaultUsername)
-    entries.reverse()
+    startServer(config, lists)
+    preloadAudios(config, lists)
+      .then(null, e => console.warn('Error while preloading:', e))
 
-    const initialState = {}
-    config.lists.forEach(list => {
-      const newest = entries.find(e => e.listName === list.name) || null
-      initialState[list.name] = newest ? newest.reference : null
-    })
-
-    console.log(getPlaylist(lists, initialState))
-    startServer(config, lists, initialState)
+    startPreloaderCron(config, lists)
   } catch (e) {
     console.error('Crash while starting', e)
   }
 })()
 
+function startPreloaderCron (config, lists) {
+  cron.schedule('0 * * * *', () => {
+    preloadAudios(config, lists)
+      .then(null, e => console.warn('Error while preloading:', e))
+  })
+}
+
 //
 // web server
 //
 
-function startServer (config, lists, initialState) {
+function startServer (config, lists) {
   const app = express()
   app.use(bodyParser.json())
   app.use(bodyParser.urlencoded({ extended: true }))
 
-  app.get('/', (req, res) => {
-    const playlist = getPlaylist(lists, initialState)
+  app.get('/', async (req, res) => {
+    const playlist = getPlaylist(lists, await getState(config))
 
     const entriesJson = JSON.stringify(playlist)
     const agendaHtml = playlist
@@ -73,8 +75,6 @@ function startServer (config, lists, initialState) {
         <div id='entry-${idx}'>${entry.name} - ${entry.reference}</div>`
       })
       .join('\n')
-
-    preloadAudios(playlist)
 
     res.send(`
 <!doctype html>
@@ -183,9 +183,27 @@ function startServer (config, lists, initialState) {
 // Audio/provider API functions
 //
 
-function preloadAudios (playlist) {
+async function getState (config) {
+  const entries = await loadHistory(defaultUsername)
+  entries.reverse()
+
+  const state = {}
+  config.lists.forEach(list => {
+    const newest = entries.find(e => e.listName === list.name) || null
+    state[list.name] = newest ? newest.reference : null
+  })
+
+  return state
+}
+
+async function preloadAudios (config, lists) {
+  const state = await getState(config)
+  const playlist = getPlaylist(lists, state)
+
+  console.log('Preloading:', playlist.map(p => p.provider + '/' + p.reference))
+
   playlist.forEach(next => {
-    getAudioFile(next.provider, next.reference)
+    return getAudioFile(next.provider, next.reference)
       .catch(e => console.warn('Error in preload of audio:', next, e))
   })
 }
