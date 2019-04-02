@@ -94,26 +94,27 @@ function generateChaptersForList (bookNames) {
 const downloadQueue = new Bottleneck({
   maxConcurrent: 1
 })
-function downloadAndProcessAudio (apiKey, passage) {
-  return downloadQueue.schedule(() => downloadChapterAudio(apiKey, passage))
-    .then(file => {
-      const refFile = file.replace('.mp3', '_ref.wav')
-      const videoFile = file.replace('.mp3', '.webm')
-      return skipIfExists(videoFile,
-        () => sayReference(passage, refFile)
-          .then(() => transcodeAudioToVideo([refFile, file], videoFile)))
-    })
-}
-
-function downloadChapterAudio (apiKey, chapter) {
-  const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(chapter)}`
-  const chapterId = chapter.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+async function downloadAndProcessAudio (apiKey, passage) {
+  const chapterId = passage.toLowerCase().replace(/[^a-z0-9]+/g, '_')
 
   const chapterFile = path.join(audioCacheDirectory, chapterId) + '.mp3'
+  const refFile = chapterFile.replace('.mp3', '_ref.wav')
+  const videoFile = chapterFile.replace('.mp3', '.webm')
 
-  return promisify(fs.mkdir)(audioCacheDirectory)
-    .catch(() => null)
-    .then(() => promisify(fs.exists)(chapterFile))
+  await promisify(fs.mkdir)(audioCacheDirectory).catch(() => null)
+
+  await Promise.all([
+    sayReference(passage, refFile),
+    await downloadQueue.schedule(() => downloadChapterAudio(apiKey, passage, chapterFile))
+  ])
+
+  return skipIfExists(videoFile, () => transcodeAudioToVideo([refFile, chapterFile], videoFile))
+}
+
+function downloadChapterAudio (apiKey, chapter, chapterFile) {
+  const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(chapter)}`
+
+  return promisify(fs.exists)(chapterFile)
     .then(exists => {
       if (exists) return chapterFile
 
