@@ -6,6 +6,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 
 const esvProvider = require('./src/esv_provider.js')
+const fileProvider = require('./src/file_provider.js')
 
 const dataDirectory = path.join(__dirname, 'data')
 const configFile = path.join(dataDirectory, 'config.json')
@@ -14,49 +15,56 @@ const defaultUsername = 'lachlan'
 
 const providers = {
   esv: esvProvider,
-  file: {
-    name: 'file',
-    getNext () { return 'null' },
-    getAudio () { return Promise.resolve('') }
-  }
+  file: fileProvider
 }
 
 //
 // startup logic
 //
 
-loadConfig()
-  .then(config => {
+;(async function () {
+  try {
+    const config = await loadConfig()
     Object.keys(providers).map(id => {
       providers[id].config = config.providers[id] || {}
     })
 
-    loadHistory(defaultUsername)
-      .then(entries => {
-        entries.reverse()
+    const lists = await Promise.all(config.lists.map(async (listConfig) => {
+      const provider = providers[listConfig.provider]
+      return {
+        name: listConfig.name,
+        provider: provider,
+        data: await provider.createList(provider.config, listConfig)
+      }
+    }))
 
-        const initialState = {}
-        config.lists.forEach(list => {
-          const newest = entries.find(e => e.listName === list.name) || null
-          initialState[list.name] = newest ? newest.reference : null
-        })
+    const entries = await loadHistory(defaultUsername)
+    entries.reverse()
 
-        console.log(getPlaylist(config, initialState))
-        startServer(config, initialState)
-      })
-  })
+    const initialState = {}
+    config.lists.forEach(list => {
+      const newest = entries.find(e => e.listName === list.name) || null
+      initialState[list.name] = newest ? newest.reference : null
+    })
+
+    console.log(getPlaylist(lists, initialState))
+    startServer(config, lists, initialState)
+  } catch (e) {
+    console.error('Crash while starting', e)
+  }
+})()
 
 //
 // web server
 //
 
-function startServer (config, initialState) {
+function startServer (config, lists, initialState) {
   const app = express()
   app.use(bodyParser.json())
   app.use(bodyParser.urlencoded({ extended: true }))
 
   app.get('/', (req, res) => {
-    const playlist = getPlaylist(config, initialState)
+    const playlist = getPlaylist(lists, initialState)
 
     const entriesJson = JSON.stringify(playlist)
     const agendaHtml = playlist
@@ -275,13 +283,12 @@ function loadConfig () {
 // state functions
 //
 
-function getPlaylist (config, state) {
-  return config.lists.map(list => {
-    const provider = providers[list.provider]
+function getPlaylist (lists, state) {
+  return lists.map(list => {
     return {
       name: list.name,
-      provider: list.provider,
-      reference: provider.getNext(provider.config, list, state[list.name])
+      provider: list.provider.name,
+      reference: list.provider.getNext(list.data, state[list.name])
     }
   })
 }

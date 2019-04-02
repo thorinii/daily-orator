@@ -211,13 +211,17 @@ function rangeUntil (count) {
 module.exports = {
   name: 'esv',
 
-  getNext (config, listConfig, reference) {
-    const chapters = generateChaptersForList(listConfig.books)
+  async createList (config, listConfig) {
+    return {
+      chapters: generateChaptersForList(listConfig.books)
+    }
+  },
 
-    let chapterIndex = chapters.indexOf(reference)
+  getNext (list, reference) {
+    let chapterIndex = list.chapters.indexOf(reference)
     if (chapterIndex < 0) chapterIndex = -1
 
-    return chapters[(chapterIndex + 1) % chapters.length]
+    return list.chapters[(chapterIndex + 1) % list.chapters.length]
   },
 
   getAudio (config, reference) {
