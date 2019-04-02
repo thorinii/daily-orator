@@ -5,6 +5,8 @@ const { promisify } = require('util')
 const express = require('express')
 const bodyParser = require('body-parser')
 
+const Bottleneck = require('bottleneck')
+
 const esvProvider = require('./src/esv_provider.js')
 const fileProvider = require('./src/file_provider.js')
 
@@ -159,7 +161,7 @@ function startServer (config, lists, initialState) {
     const reference = (req.query.q || '').trim()
     console.log('GET /audio?p=%s&q=%s', providerId, reference)
 
-    getAudio(providerId, reference)
+    getAudioFile(providerId, reference)
       .then(file => res.sendFile(file, { acceptRanges: false }))
       .then(null, e => next(e))
   })
@@ -183,39 +185,26 @@ function startServer (config, lists, initialState) {
 // Audio/provider API functions
 //
 
-const preloadQueue = []
-let preloadGoing = false
 function preloadAudios (playlist) {
-  playlist.forEach(p => preloadQueue.push(p))
-
-  function pumpOne () {
-    if (preloadQueue.length === 0) {
-      preloadGoing = false
-      return
-    }
-
-    preloadGoing = true
-
-    const next = preloadQueue.shift()
-    getAudio(next.provider, next.reference)
+  playlist.forEach(next => {
+    getAudioFile(next.provider, next.reference)
       .catch(e => console.warn('Error in preload of audio:', next, e))
-      .then(() => pumpOne())
-  }
-
-  if (!preloadGoing) {
-    pumpOne()
-  }
+  })
 }
 
+const downloadQueue = new Bottleneck({
+  minTime: 500,
+  maxConcurrent: 1
+})
 const downloadState = {}
-function getAudio (providerId, reference) {
+function getAudioFile (providerId, reference) {
   const provider = providers[providerId]
   const audioId = providerId + '_' + reference
 
   const existingPromise = downloadState[audioId]
   if (existingPromise) return existingPromise
 
-  const p = provider.getAudio(provider.config, reference)
+  const p = downloadQueue.schedule(() => provider.getAudio(provider.config, reference))
 
   downloadState[audioId] = p
   p.then(
