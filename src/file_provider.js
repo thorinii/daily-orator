@@ -21,7 +21,10 @@ module.exports = {
   },
 
   getNext (list, reference) {
-    return list.files[0]
+    let index = list.files.indexOf(reference)
+    if (index < 0) index = -1
+
+    return list.files[(index + 1) % list.files.length]
   },
 
   async getAudio (config, reference) {
