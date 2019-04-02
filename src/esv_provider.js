@@ -3,6 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const { promisify } = require('util')
 
+const Bottleneck = require('bottleneck')
 const request = require('request')
 
 const dataDirectory = path.join(__dirname, '..', 'data')
@@ -90,8 +91,11 @@ function generateChaptersForList (bookNames) {
 // ESV API functions
 //
 
+const downloadQueue = new Bottleneck({
+  maxConcurrent: 1
+})
 function downloadAndProcessAudio (apiKey, passage) {
-  return downloadChapterAudio(apiKey, passage)
+  return downloadQueue.schedule(() => downloadChapterAudio(apiKey, passage))
     .then(file => {
       const refFile = file.replace('.mp3', '_ref.wav')
       const videoFile = file.replace('.mp3', '.webm')

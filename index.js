@@ -5,8 +5,6 @@ const { promisify } = require('util')
 const express = require('express')
 const bodyParser = require('body-parser')
 
-const Bottleneck = require('bottleneck')
-
 const esvProvider = require('./src/esv_provider.js')
 const fileProvider = require('./src/file_provider.js')
 
@@ -192,10 +190,6 @@ function preloadAudios (playlist) {
   })
 }
 
-const downloadQueue = new Bottleneck({
-  minTime: 500,
-  maxConcurrent: 1
-})
 const downloadState = {}
 function getAudioFile (providerId, reference) {
   const provider = providers[providerId]
@@ -204,7 +198,7 @@ function getAudioFile (providerId, reference) {
   const existingPromise = downloadState[audioId]
   if (existingPromise) return existingPromise
 
-  const p = downloadQueue.schedule(() => provider.getAudio(provider.config, reference))
+  const p = provider.getAudio(provider.config, reference)
 
   downloadState[audioId] = p
   p.then(
