@@ -2,6 +2,8 @@ const glob = require('glob')
 const path = require('path')
 const { promisify } = require('util')
 
+const { skipIfExists, transcodeAudioToVideo } = require('./utils')
+
 const dataPath = path.join(__dirname, '..', 'data')
 const audioPath = path.join(dataPath, 'file_audio')
 
@@ -23,6 +25,10 @@ module.exports = {
   },
 
   async getAudio (config, reference) {
-    return path.join(audioPath, reference)
+    const originalPath = path.join(audioPath, reference)
+    const transcodedPath = originalPath.replace('.mp3', '.webm')
+    return skipIfExists(transcodedPath, () => {
+      return transcodeAudioToVideo(originalPath, transcodedPath)
+    })
   }
 }

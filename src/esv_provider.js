@@ -6,6 +6,8 @@ const { promisify } = require('util')
 const Bottleneck = require('bottleneck')
 const request = require('request')
 
+const { joinAudioFiles, transcodeAudioToVideo, skipIfExists } = require('./utils')
+
 const dataDirectory = path.join(__dirname, '..', 'data')
 const audioCacheDirectory = path.join(dataDirectory, 'esv_cache')
 const sweepAgeDays = process.env.SWEEP_AGE_DAYS || 2
@@ -103,12 +105,14 @@ async function downloadAndProcessAudio (apiKey, passage) {
 
   await promisify(fs.mkdir)(audioCacheDirectory).catch(() => null)
 
-  await Promise.all([
-    sayReference(passage, refFile),
+  return skipIfExists(videoFile, async () => {
     await downloadQueue.schedule(() => downloadChapterAudio(apiKey, passage, chapterFile))
-  ])
+    await sayReference(passage, refFile)
 
-  return skipIfExists(videoFile, () => transcodeAudioToVideo([refFile, chapterFile], videoFile))
+    const tmpFile = chapterFile.replace('.mp3', '_tmp.mp3')
+    await joinAudioFiles([refFile, chapterFile], tmpFile)
+    return transcodeAudioToVideo(tmpFile, videoFile)
+  })
 }
 
 function downloadChapterAudio (apiKey, chapter, chapterFile) {
@@ -136,29 +140,6 @@ function downloadChapterAudio (apiKey, chapter, chapterFile) {
     .then(() => chapterFile)
 }
 
-function transcodeAudioToVideo (files, outFile) {
-  const tmpFile = outFile.replace('.', '_tmp.')
-  const concatConfig = files.map((f, idx) => `[${idx}:0]`).join('') +
-    `concat=n=${files.length}:v=0:a=1[out]`
-  const cmd1 = [
-    '-y',
-    ...[].concat(...files.map(f => ['-i', f])),
-    '-filter_complex', concatConfig, '-map', '[out]',
-    tmpFile]
-
-  const cmd2 = [
-    '-y',
-    '-i', tmpFile,
-    '-f', 'lavfi', '-i', 'color=c=black:s=720x406:r=25:sar=1/1:d=13',
-    '-c:a', 'copy',
-    outFile]
-
-  return promisify(childProcess.execFile)('ffmpeg', cmd1)
-    .then(() => promisify(childProcess.execFile)('ffmpeg', cmd2))
-    .then(() => console.log('transcoded to', outFile))
-    .then(() => outFile)
-}
-
 function sayReference (chapter, outFile) {
   console.log('saying reference:', chapter)
   const cmd = [
@@ -168,11 +149,6 @@ function sayReference (chapter, outFile) {
     '-w', outFile]
   return promisify(childProcess.execFile)('espeak', cmd)
     .then(() => outFile)
-}
-
-function skipIfExists (file, fn) {
-  return promisify(fs.exists)(file)
-    .then(exists => exists ? file : fn())
 }
 
 function sweepOldAudio () {
