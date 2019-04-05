@@ -11,12 +11,12 @@ module.exports = {
   name: 'file',
 
   async createList (config, listConfig) {
-    const files = await promisify(glob)('**/*.mp3', {
-      cwd: audioPath
-    })
-
     return {
-      files
+      files: [].concat(...(await Promise.all(listConfig.files.map(g => {
+        return promisify(glob)(g, {
+          cwd: audioPath
+        })
+      }))))
     }
   },
 
@@ -29,7 +29,7 @@ module.exports = {
 
   async getAudio (config, reference) {
     const originalPath = path.join(audioPath, reference)
-    const transcodedPath = originalPath.replace('.mp3', '.webm')
+    const transcodedPath = originalPath + '.webm'
     return skipIfExists(transcodedPath, () => {
       return transcodeAudioToVideo(originalPath, transcodedPath)
     })
