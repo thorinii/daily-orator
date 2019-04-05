@@ -208,22 +208,34 @@ async function preloadAudios (config, lists) {
   })
 }
 
-const downloadState = {}
+class IdempotentQueryThreader {
+  constructor () {
+    this._requests = new Map()
+  }
+
+  thread (key, fn) {
+    const existing = this._requests.get(key)
+    if (existing) return existing
+
+    const promise = fn()
+    this._requests.set(key, promise)
+
+    promise.then(
+      () => { this._requests.delete(key) },
+      () => { this._requests.delete(key) })
+
+    return promise
+  }
+}
+
+const queryThreader = new IdempotentQueryThreader()
 function getAudioFile (providerId, reference) {
   const provider = providers[providerId]
-  const audioId = providerId + '_' + reference
+  const key = providerId + ':' + reference
 
-  const existingPromise = downloadState[audioId]
-  if (existingPromise) return existingPromise
-
-  const p = provider.getAudio(provider.config, reference)
-
-  downloadState[audioId] = p
-  p.then(
-    () => { delete downloadState[audioId] },
-    () => { delete downloadState[audioId] })
-
-  return p
+  return queryThreader.thread(key, () => {
+    return provider.getAudio(provider.config, reference)
+  })
 }
 
 //
