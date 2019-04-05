@@ -96,48 +96,37 @@ function generateChaptersForList (bookNames) {
 const downloadQueue = new Bottleneck({
   maxConcurrent: 1
 })
-async function downloadAndProcessAudio (apiKey, passage) {
-  const chapterId = passage.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+async function downloadAndProcessAudio (apiKey, passage, tempSource) {
+  const chapterFile = await tempSource.getTemp('mp3')
+  const refFile = await tempSource.getTemp('mp3')
+  const joinedFile = await tempSource.getTemp('mp3')
 
-  const chapterFile = path.join(audioCacheDirectory, chapterId) + '.mp3'
-  const refFile = chapterFile.replace('.mp3', '_ref.wav')
-  const videoFile = chapterFile.replace('.mp3', '.webm')
+  const downloadP = downloadQueue.schedule(() => downloadChapterAudio(apiKey, passage, chapterFile))
+  const refP = sayReference(passage, refFile)
 
-  await promisify(fs.mkdir)(audioCacheDirectory).catch(() => null)
+  await downloadP
+  await refP
+  await joinAudioFiles([refFile, chapterFile], joinedFile)
 
-  return skipIfExists(videoFile, async () => {
-    await downloadQueue.schedule(() => downloadChapterAudio(apiKey, passage, chapterFile))
-    await sayReference(passage, refFile)
-
-    const tmpFile = chapterFile.replace('.mp3', '_tmp.mp3')
-    await joinAudioFiles([refFile, chapterFile], tmpFile)
-    return transcodeAudioToVideo(tmpFile, videoFile)
-  })
+  return joinedFile
 }
 
-function downloadChapterAudio (apiKey, chapter, chapterFile) {
+async function downloadChapterAudio (apiKey, chapter, chapterFile) {
+  console.log('downloading', chapter, 'from ESV')
+
   const url = `https://api.esv.org/v3/passage/audio/?q=${encodeURIComponent(chapter)}`
-
-  return promisify(fs.exists)(chapterFile)
-    .then(exists => {
-      if (exists) return chapterFile
-
-      console.log('getting chapter from ESV:', chapter)
-
-      return new Promise((resolve, reject) => {
-        request({
-          url,
-          headers: {
-            'Authorization': 'Token ' + apiKey
-          },
-          encoding: null
-        })
-          .pipe(fs.createWriteStream(chapterFile))
-          .on('error', e => reject(e))
-          .on('close', () => resolve())
-      })
+  return new Promise((resolve, reject) => {
+    request({
+      url,
+      headers: {
+        'Authorization': 'Token ' + apiKey
+      },
+      encoding: null
     })
-    .then(() => chapterFile)
+      .pipe(fs.createWriteStream(chapterFile))
+      .on('error', e => reject(e))
+      .on('close', () => resolve())
+  })
 }
 
 function sayReference (chapter, outFile) {
@@ -149,32 +138,6 @@ function sayReference (chapter, outFile) {
     '-w', outFile]
   return promisify(childProcess.execFile)('espeak', cmd)
     .then(() => outFile)
-}
-
-function sweepOldAudio () {
-  const minKeepMs = 1 * 60 * 60 * 1000 // for sanity, keep for at least an hour
-  const sweepAgeMs = Math.max(sweepAgeDays * 24 * 60 * 60 * 1000, minKeepMs)
-  const now = Date.now()
-
-  return promisify(fs.readdir)(audioCacheDirectory)
-    .then(files => {
-      return Promise.all(files.map(f => {
-        const p = path.join(audioCacheDirectory, f)
-        return promisify(fs.stat)(p)
-          .then(stat => ({ file: p, stat }))
-      }))
-    })
-    .then(fileStats => {
-      return Promise.all(fileStats.map(f => {
-        const age = now - f.stat.mtimeMs
-        const shouldDelete = age > sweepAgeMs
-
-        if (shouldDelete) {
-          console.log('deleting', path.basename(f.file))
-          return promisify(fs.unlink)(f.file)
-        } else return null
-      }))
-    })
 }
 
 //
@@ -205,9 +168,7 @@ module.exports = {
     return list.chapters[(chapterIndex + 1) % list.chapters.length]
   },
 
-  getAudio (config, reference) {
-    sweepOldAudio()
-      .then(null, e => console.warn('Error in sweeping:', e))
-    return downloadAndProcessAudio(config.api_key, reference)
+  getAudioTempFile (config, reference, tempSource) {
+    return downloadAndProcessAudio(config.api_key, reference, tempSource)
   }
 }

@@ -1,8 +1,7 @@
+const fs = require('fs')
 const glob = require('glob')
 const path = require('path')
 const { promisify } = require('util')
-
-const { skipIfExists, transcodeAudioToVideo } = require('./utils')
 
 const dataPath = path.join(__dirname, '..', 'data')
 const audioPath = path.join(dataPath, 'file_audio')
@@ -27,11 +26,11 @@ module.exports = {
     return list.files[(index + 1) % list.files.length]
   },
 
-  async getAudio (config, reference) {
+  async getAudioTempFile (config, reference, tempSource) {
     const originalPath = path.join(audioPath, reference)
-    const transcodedPath = originalPath + '.webm'
-    return skipIfExists(transcodedPath, () => {
-      return transcodeAudioToVideo(originalPath, transcodedPath)
-    })
+    const parsed = path.parse(originalPath)
+    const destination = await tempSource.getTemp(parsed.ext.substring(1))
+    await promisify(fs.copyFile)(originalPath, destination)
+    return destination
   }
 }

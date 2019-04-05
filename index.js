@@ -5,9 +5,11 @@ const { promisify } = require('util')
 const express = require('express')
 const bodyParser = require('body-parser')
 const cron = require('node-cron')
+const md5 = require('md5')
 
 const esvProvider = require('./src/esv_provider.js')
 const fileProvider = require('./src/file_provider.js')
+const { transcodeAudioToVideo } = require('./src/utils')
 
 const dataDirectory = path.join(__dirname, 'data')
 const configFile = path.join(dataDirectory, 'config.json')
@@ -22,6 +24,124 @@ const providers = {
 //
 // startup logic
 //
+
+class IdempotentQueryThreader {
+  constructor () {
+    this._requests = new Map()
+  }
+
+  thread (key, fn) {
+    const existing = this._requests.get(key)
+    if (existing) return existing
+
+    const promise = fn()
+    this._requests.set(key, promise)
+
+    promise.then(
+      () => { this._requests.delete(key) },
+      () => { this._requests.delete(key) })
+
+    return promise
+  }
+}
+
+class TempFileSource {
+  constructor (dirPath) {
+    this._dirPath = dirPath
+    this._key = md5(Date.now() + ':' + Math.random())
+    this._counter = 0
+    this._created = []
+  }
+
+  async getTemp (extension) {
+    try {
+      await promisify(fs.mkdir)(this._dirPath)
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e
+    }
+
+    const filename = 'tmp_' + this._key + '_' + this._counter + '.' + extension
+    this._counter++
+    const filePath = path.join(this._dirPath, filename)
+    this._created.push(filePath)
+
+    return filePath
+  }
+
+  async cleanup () {
+    for (const f of this._created) {
+      try {
+        console.log('deleting', f)
+        await promisify(fs.unlink)(f)
+      } catch (e) {
+        if (e.code !== 'ENOENT') throw e
+      }
+    }
+  }
+}
+
+class FileCache {
+  constructor (cachePath, expireAfterDays) {
+    this._cachePath = cachePath
+    this._expireAfterDays = expireAfterDays
+    this._queryThreader = new IdempotentQueryThreader()
+  }
+
+  async get (key, fileExtension, fn) {
+    const hashKey = md5(key)
+
+    return this._queryThreader.thread(hashKey, async () => {
+      const sanitisedKey = key.replace(/[^a-zA-Z0-9]+/g, '_')
+      const filename = hashKey + '_' + sanitisedKey + '.' + fileExtension
+      const filePath = path.join(this._cachePath, filename)
+
+      try {
+        await promisify(fs.mkdir)(this._cachePath)
+      } catch (e) {
+        if (e.code !== 'EEXIST') throw e
+      }
+
+      try {
+        const now = new Date()
+        await promisify(fs.utimes)(filePath, now, now)
+        return filePath
+      } catch (e) {
+        if (e.code !== 'ENOENT') throw e
+
+        await fn(filePath)
+        return filePath
+      }
+    })
+  }
+
+  async sweep () {
+    const minKeepMs = 1 * 60 * 60 * 1000 // for sanity, keep for at least an hour
+    const sweepAgeMs = Math.max(this._expireAfterDays * 24 * 60 * 60 * 1000, minKeepMs)
+    const now = Date.now()
+
+    return promisify(fs.readdir)(this._cachePath)
+      .then(files => {
+        return Promise.all(files.map(f => {
+          const p = path.join(this._cachePath, f)
+          return promisify(fs.stat)(p)
+            .then(stat => ({ file: p, stat }))
+        }))
+      })
+      .then(fileStats => {
+        return Promise.all(fileStats.map(f => {
+          const age = now - f.stat.mtimeMs
+          const shouldDelete = age > sweepAgeMs
+
+          if (shouldDelete) {
+            console.log('deleting', path.basename(f.file))
+            return promisify(fs.unlink)(f.file)
+          } else return null
+        }))
+      })
+  }
+}
+
+const fileCache = new FileCache(path.join(dataDirectory, 'cache'), 2)
 
 ;(async function () {
   try {
@@ -202,39 +322,23 @@ async function preloadAudios (config, lists) {
 
   console.log('Preloading:', playlist.map(p => p.provider + '/' + p.reference))
 
+  await fileCache.sweep()
   playlist.forEach(next => {
     return getAudioFile(next.provider, next.reference)
       .catch(e => console.warn('Error in preload of audio:', next, e))
   })
 }
 
-class IdempotentQueryThreader {
-  constructor () {
-    this._requests = new Map()
-  }
-
-  thread (key, fn) {
-    const existing = this._requests.get(key)
-    if (existing) return existing
-
-    const promise = fn()
-    this._requests.set(key, promise)
-
-    promise.then(
-      () => { this._requests.delete(key) },
-      () => { this._requests.delete(key) })
-
-    return promise
-  }
-}
-
-const queryThreader = new IdempotentQueryThreader()
 function getAudioFile (providerId, reference) {
   const provider = providers[providerId]
   const key = providerId + ':' + reference
 
-  return queryThreader.thread(key, () => {
-    return provider.getAudio(provider.config, reference)
+  return fileCache.get(key, 'webm', async (destination) => {
+    const tempSource = new TempFileSource(path.join(dataDirectory, 'tmp'))
+
+    const audioPath = await provider.getAudioTempFile(provider.config, reference, tempSource)
+    await transcodeAudioToVideo(audioPath, destination)
+    tempSource.cleanup()
   })
 }
 
