@@ -95,11 +95,7 @@ class FileCache {
       const filename = hashKey + '_' + sanitisedKey + '.' + fileExtension
       const filePath = path.join(this._cachePath, filename)
 
-      try {
-        await promisify(fs.mkdir)(this._cachePath)
-      } catch (e) {
-        if (e.code !== 'EEXIST') throw e
-      }
+      await this._ensureDir()
 
       try {
         const now = new Date()
@@ -118,6 +114,8 @@ class FileCache {
     const minKeepMs = 1 * 60 * 60 * 1000 // for sanity, keep for at least an hour
     const sweepAgeMs = Math.max(this._expireAfterDays * 24 * 60 * 60 * 1000, minKeepMs)
     const now = Date.now()
+
+    await this._ensureDir()
 
     return promisify(fs.readdir)(this._cachePath)
       .then(files => {
@@ -138,6 +136,14 @@ class FileCache {
           } else return null
         }))
       })
+  }
+
+  async _ensureDir () {
+    try {
+      await promisify(fs.mkdir)(this._cachePath)
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e
+    }
   }
 }
 
