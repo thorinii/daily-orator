@@ -286,7 +286,7 @@ function startServer (config, lists) {
     console.log('GET /audio?p=%s&q=%s', providerId, reference)
 
     getAudioFile(providerId, reference)
-      .then(file => res.sendFile(file, { acceptRanges: false }))
+      .then(file => res.sendFile(file, { acceptRanges: true }))
       .then(null, e => next(e))
   })
 

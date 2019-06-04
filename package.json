@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node index.js",
     "style:check": "eslint .",
-    "pkg": "tar -czf daily-orator.tar.gz index.js src/ package.json yarn.lock node_modules/ config.default.json"
+    "pkg": "tar -czf daily-orator.tar.gz package.json yarn.lock node_modules/ index.js src/ config.default.json"
   },
   "dependencies": {
     "body-parser": "^1.18.3",
