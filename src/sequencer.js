@@ -1,26 +1,63 @@
 main()
 
 function main () {
+  const maxLength = 40
   const playlists = [
     { name: 'Greek', playOrder: 1, length: 10 },
-    { name: 'Gospels', playOrder: 0, length: 12 },
+    { name: 'Gospels', playOrder: 0 },
     { name: 'History', playOrder: 2, length: 12 }
   ]
 
-  const maxLength = 40
+  const trackList = sequencePlaylists(playlists, maxLength)
 
-  const filledPlaylists = []
+  console.log('track list (length %d):', len(trackList))
+  console.log(trackList)
+}
+
+function sequencePlaylists (playlists, maxLength) {
+  const filledPlaylists = playlists.map(p => ({
+    playlist: p,
+    playOrder: p.playOrder,
+    limit: p.length,
+    tracks: [],
+    generator: generateAvailableTracks(p)
+  }))
+
+  // iterate through each playlist and try add at least one non-prologue track
+
   let totalLength = 0
-  playlists
-    .forEach(playlist => {
-      const tracksGenerator = generateAvailableTracks(playlist, maxLength)
+  let addedTracks
+  do {
+    addedTracks = false
 
-      const availableSpace = Math.min(playlist.length, maxLength - totalLength)
-      const committedTracks = fillWithConstraints(tracksGenerator, availableSpace)
+    filledPlaylists.forEach(playlist => {
+      const limit = playlist.limit || Infinity
+      const uncommitted = []
 
-      filledPlaylists.push({ tracks: committedTracks, playOrder: playlist.playOrder })
-      totalLength += committedTracks.reduce((acc, t) => acc + t.length, 0)
+      let hasCommitted = false
+      while (true) {
+        let { value: track, done } = playlist.generator.next()
+        if (done) break
+        if (len(playlist.tracks) + track.length > limit) break
+        if (len(uncommitted) + track.length + totalLength > maxLength) break
+
+        uncommitted.push(track)
+
+        // only commit to adding any tracks if there's at least one non-prologue
+        // track
+        if (!track.prologue) {
+          hasCommitted = true
+          break
+        }
+      }
+
+      if (hasCommitted) {
+        playlist.tracks = [...playlist.tracks, ...uncommitted]
+        totalLength += len(uncommitted)
+        addedTracks = true
+      }
     })
+  } while (addedTracks)
 
   const trackList = []
   filledPlaylists
@@ -28,13 +65,12 @@ function main () {
     .map(p => p.tracks)
     .forEach(tracks => tracks.forEach(t => trackList.push(t)))
 
-  console.log('track list (length %d):', trackList.reduce((acc, t) => acc + t.length, 0))
-  console.log(trackList)
+  return trackList
 }
 
 function * generateAvailableTracks (playlist) {
   // dummy implementation
-  const trackLength = playlist.name === 'Gospels' ? 4 : 2
+  const trackLength = playlist.name === 'Gospels' ? 6 : 2
 
   let index = 0
   if (playlist.name === 'Gospels') {
@@ -48,24 +84,6 @@ function * generateAvailableTracks (playlist) {
   }
 }
 
-/**
- * Returns a list of tracks taken from the generator totalling up to the
- * maxLength. If only prologue tracks and no main tracks, this will return an
- * empty list.
- */
-function fillWithConstraints (tracksGenerator, maxLength) {
-  const list = []
-  let hasCommitted = false
-  let soFar = 0
-
-  for (const track of tracksGenerator) {
-    if (soFar + track.length > maxLength) break
-
-    list.push(track)
-    hasCommitted = hasCommitted || !track.prologue
-    soFar += track.length
-  }
-
-  if (hasCommitted) return list
-  else return []
+function len (tracks) {
+  return tracks.reduce((acc, t) => acc + t.length, 0)
 }
