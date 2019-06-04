@@ -2,24 +2,31 @@ main()
 
 function main () {
   const playlists = [
-    { name: 'Gospels', fillOrder: 1, length: 12 },
-    { name: 'Greek', fillOrder: 0, length: 5 },
-    { name: 'History', fillOrder: 2, length: 12 }
+    { name: 'Greek', playOrder: 1, length: 10 },
+    { name: 'Gospels', playOrder: 0, length: 12 },
+    { name: 'History', playOrder: 2, length: 12 }
   ]
 
-  const maxLength = 24
+  const maxLength = 40
+
+  const filledPlaylists = []
+  let totalLength = 0
+  playlists
+    .forEach(playlist => {
+      const tracksGenerator = generateAvailableTracks(playlist, maxLength)
+
+      const availableSpace = Math.min(playlist.length, maxLength - totalLength)
+      const committedTracks = fillWithConstraints(tracksGenerator, availableSpace)
+
+      filledPlaylists.push({ tracks: committedTracks, playOrder: playlist.playOrder })
+      totalLength += committedTracks.reduce((acc, t) => acc + t.length, 0)
+    })
 
   const trackList = []
-  let totalLength = 0
-  for (const playlist of playlists) {
-    const tracksGenerator = generateAvailableTracks(playlist, maxLength)
-
-    const availableSpace = Math.min(playlist.length, maxLength - totalLength)
-    const committedTracks = fillWithConstraints(tracksGenerator, availableSpace)
-
-    committedTracks.forEach(t => trackList.push(t))
-    totalLength += committedTracks.reduce((acc, t) => acc + t.length, 0)
-  }
+  filledPlaylists
+    .sort((a, b) => a.playOrder < b.playOrder ? -1 : 1)
+    .map(p => p.tracks)
+    .forEach(tracks => tracks.forEach(t => trackList.push(t)))
 
   console.log('track list (length %d):', trackList.reduce((acc, t) => acc + t.length, 0))
   console.log(trackList)
@@ -27,11 +34,11 @@ function main () {
 
 function * generateAvailableTracks (playlist) {
   // dummy implementation
-  const trackLength = playlist.name === 'Gospels' ? 5 : 2
+  const trackLength = playlist.name === 'Gospels' ? 4 : 2
 
   let index = 0
   if (playlist.name === 'Gospels') {
-    yield { list: playlist.name, length: 1, index, prologue: true }
+    yield { list: playlist.name, length: 2, index, prologue: true }
     index++
   }
 
