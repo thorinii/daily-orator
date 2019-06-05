@@ -990,6 +990,11 @@ isstream@~0.1.2:
   resolved "https://registry.yarnpkg.com/isstream/-/isstream-0.1.2.tgz#47e63f7af55afa6f92e1500e690eb8b8529c099a"
   integrity sha1-R+Y/evVa+m+S4VAOaQ64uFKcCZo=
 
+js-joda-timezone@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/js-joda-timezone/-/js-joda-timezone-2.0.2.tgz#9e95df374200e01448173e73ee0b5681c79283f4"
+  integrity sha512-d7aFR6Oa5ScsupMSUUFWOh3Iz/EFq4M8+owch4V2FDr94P1+f/hch/xvTMHusM6dYeYCkvky+eRKHKnTn7YjDw==
+
 js-joda@^1.10.1:
   version "1.10.1"
   resolved "https://registry.yarnpkg.com/js-joda/-/js-joda-1.10.1.tgz#41e2f0a646dd63f2bf75d74471743eaafc91a5f2"
