@@ -4,7 +4,7 @@ function sequencePlaylists (playlists, maxLength) {
     countLimit: p.count,
     limit: p.length,
     tracks: [],
-    generator: generateAvailableTracks(p)
+    generator: p.trackSource()
   }))
 
   // iterate through each playlist and try add at least one non-prologue track
@@ -52,22 +52,6 @@ function sequencePlaylists (playlists, maxLength) {
     .forEach(tracks => tracks.forEach(t => trackList.push(t)))
 
   return trackList
-}
-
-function * generateAvailableTracks (playlist) {
-  // dummy implementation
-  const trackLength = playlist.name === 'Gospels' ? 7.3 : 3.37
-
-  let index = 0
-  if (playlist.name === 'Gospels') {
-    yield { prologue: true, length: 1.1, index, list: playlist.name }
-    index++
-  }
-
-  while (true) {
-    yield { prologue: false, length: trackLength, index, list: playlist.name }
-    index++
-  }
 }
 
 function len (tracks) {
