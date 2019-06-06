@@ -9,8 +9,8 @@ class Cron {
     this.intervalId = null
   }
 
-  schedule (hour, fn) {
-    this.fns.push({ hour, fn, last: null })
+  schedule (fn) {
+    this.fns.push({ fn })
     return this
   }
 
@@ -26,15 +26,10 @@ class Cron {
     const now = jodatime.ZonedDateTime.now(this.tz)
 
     for (const fn of this.fns) {
-      if (fn.last !== null && fn.last.dayOfWeek() === now.dayOfWeek()) continue
-      if (now.hour() < fn.hour) continue
-
       try {
-        fn.fn()
+        fn.fn(now)
       } catch (e) {
         console.warn('Failed to execute cron function:', e)
-      } finally {
-        fn.last = now
       }
     }
   }
@@ -49,7 +44,7 @@ class Cron {
 }
 
 new Cron(Cron.zoneId('Australia/Adelaide'), 1000)
-  .schedule(21, () => console.log('yo'))
+  .schedule(() => console.log('yo'))
   .start()
 
 module.exports = Cron
