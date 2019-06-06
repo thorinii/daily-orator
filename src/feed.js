@@ -7,6 +7,7 @@ const md5 = require('md5')
 
 const FEED_NAME = process.env.FEED_NAME || 'Daily Orator'
 const FEED_SITE_URL = process.env.FEED_URL || 'http://localhost:3000/'
+const MAX_ITEMS = process.env.FEED_LENGTH || 100
 
 async function generateRss (dataPath) {
   const feedItems = await readFeed(dataPath)
@@ -51,8 +52,13 @@ async function addItem (dataPath, url, title, timestamp = null) {
     url
   }
 
-  const feed = await readFeed(dataPath)
+  let feed = await readFeed(dataPath)
+
   feed.push(item)
+  if (feed.length > MAX_ITEMS) {
+    feed = feed.slice(feed.length - MAX_ITEMS)
+  }
+
   const store = makeStore(dataPath)
   await store.write(feed)
 }
@@ -67,13 +73,9 @@ function makeStore (dataPath) {
   const dataPath = path.join(__dirname, '../data')
   console.log('adding item')
   await addItem(dataPath, FEED_SITE_URL + 'audio/thing.mp3', 'A thing')
-
-  console.log('feed', await readFeed(dataPath))
   await addItem(dataPath, FEED_SITE_URL + 'audio/thing2.mp3', 'Another thing')
 
   console.log('feed', await readFeed(dataPath))
-
-  console.log('feed xml', await generateRss(dataPath))
 })().then(null, e => console.log('error', e))
 
 module.exports = {
