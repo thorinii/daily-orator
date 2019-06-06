@@ -1,5 +1,65 @@
 const sequencePlaylists = require('./sequencer')
 
+const config = {
+  playlists: {
+    'Gospels': {
+      provider: 'file',
+      prologue: '30s',
+      trackSource: long
+    },
+    'Greek': {
+      provider: 'esv',
+      prologue: false,
+      trackSource: short
+    },
+    'History': {
+      provider: 'esv',
+      prologue: '30s',
+      trackSource: long
+    }
+  },
+
+  globalConstraints: {
+    runtime: 40,
+
+    'Sunday': {
+      runtime: 0
+    },
+    'Saturday': {
+      runtime: 0
+    }
+  },
+
+  schedule: [
+    {
+      name: 'Gospels',
+      fillOrder: 1,
+      constraints: {
+        'Friday': {
+          count: 0
+        }
+      }
+    },
+    {
+      name: 'Greek',
+      fillOrder: 0,
+      constraints: {
+        count: 1,
+        'Friday': {
+          count: null
+        }
+      }
+    },
+    {
+      name: 'History',
+      fillOrder: 2,
+      constraints: {
+        length: 12
+      }
+    }
+  ]
+}
+
 function main () {
   const maxLength = 37
   const playlists = [
@@ -15,8 +75,14 @@ function main () {
 }
 
 function scheduleTracks () {
-
+  // realise global constraints
+  // realise playlists and constraints
+  // source tracks for maxlength
+  // sequence the tracks
+  // return tracks
 }
+
+function realiseConstraints (now, constraints) {}
 
 function * short () {
   // dummy implementation
