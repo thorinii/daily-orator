@@ -1,23 +1,7 @@
-main()
-
-function main () {
-  const maxLength = 40
-  const playlists = [
-    { name: 'Greek', playOrder: 1, length: 10 },
-    { name: 'Gospels', playOrder: 0 },
-    { name: 'History', playOrder: 2, length: 12 }
-  ]
-
-  const trackList = sequencePlaylists(playlists, maxLength)
-
-  console.log('track list (length %d):', len(trackList))
-  console.log(trackList)
-}
-
 function sequencePlaylists (playlists, maxLength) {
   const filledPlaylists = playlists.map(p => ({
-    playlist: p,
     playOrder: p.playOrder,
+    countLimit: p.count,
     limit: p.length,
     tracks: [],
     generator: generateAvailableTracks(p)
@@ -31,6 +15,7 @@ function sequencePlaylists (playlists, maxLength) {
     addedTracks = false
 
     filledPlaylists.forEach(playlist => {
+      const countLimit = playlist.countLimit || Infinity
       const limit = playlist.limit || Infinity
       const uncommitted = []
 
@@ -38,6 +23,7 @@ function sequencePlaylists (playlists, maxLength) {
       while (true) {
         let { value: track, done } = playlist.generator.next()
         if (done) break
+        if (playlist.tracks.length >= countLimit) break
         if (len(playlist.tracks) + track.length > limit) break
         if (len(uncommitted) + track.length + totalLength > maxLength) break
 
@@ -70,16 +56,16 @@ function sequencePlaylists (playlists, maxLength) {
 
 function * generateAvailableTracks (playlist) {
   // dummy implementation
-  const trackLength = playlist.name === 'Gospels' ? 6 : 2
+  const trackLength = playlist.name === 'Gospels' ? 7.3 : 3.37
 
   let index = 0
   if (playlist.name === 'Gospels') {
-    yield { list: playlist.name, length: 2, index, prologue: true }
+    yield { prologue: true, length: 1.1, index, list: playlist.name }
     index++
   }
 
   while (true) {
-    yield { list: playlist.name, length: trackLength, index, prologue: false }
+    yield { prologue: false, length: trackLength, index, list: playlist.name }
     index++
   }
 }
@@ -87,3 +73,5 @@ function * generateAvailableTracks (playlist) {
 function len (tracks) {
   return tracks.reduce((acc, t) => acc + t.length, 0)
 }
+
+module.exports = sequencePlaylists
