@@ -1,8 +1,8 @@
 function sequencePlaylists (playlists, maxLength) {
   const filledPlaylists = playlists.map(p => ({
     playOrder: p.playOrder,
-    countLimit: p.count,
-    limit: p.length,
+    countLimit: p.constraints.count || Infinity,
+    runtimeLimit: p.constraints.runtime || Infinity,
     tracks: [],
     generator: p.trackSource()
   }))
@@ -15,8 +15,8 @@ function sequencePlaylists (playlists, maxLength) {
     addedTracks = false
 
     filledPlaylists.forEach(playlist => {
-      const countLimit = playlist.countLimit || Infinity
-      const limit = playlist.limit || Infinity
+      const countLimit = playlist.countLimit
+      const runtimeLimit = playlist.runtimeLimit
       const uncommitted = []
 
       let hasCommitted = false
@@ -24,7 +24,7 @@ function sequencePlaylists (playlists, maxLength) {
         let { value: track, done } = playlist.generator.next()
         if (done) break
         if (playlist.tracks.length >= countLimit) break
-        if (len(playlist.tracks) + track.length > limit) break
+        if (len(playlist.tracks) + track.length > runtimeLimit) break
         if (len(uncommitted) + track.length + totalLength > maxLength) break
 
         uncommitted.push(track)

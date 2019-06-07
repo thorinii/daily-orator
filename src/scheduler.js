@@ -5,18 +5,15 @@ const config = {
   playlists: {
     'Gospels': {
       provider: 'file',
-      prologue: '30s',
-      trackSource: long
+      prologue: '30s'
     },
     'Greek': {
       provider: 'esv',
-      prologue: false,
-      trackSource: short
+      prologue: false
     },
     'History': {
       provider: 'esv',
-      prologue: '30s',
-      trackSource: long
+      prologue: '30s'
     }
   },
 
@@ -66,39 +63,15 @@ function main () {
 }
 
 function scheduleTracks (now, config) {
-  const maxLength = 37
-  const playlists = [
-    { name: 'Greek', playOrder: 1, length: 10, count: 1, trackSource: short },
-    { name: 'Gospels', playOrder: 0, trackSource: long },
-    { name: 'History', playOrder: 2, length: 12, trackSource: long }
-  ]
-
   const globalConstraints = realiseConstraints(now, config.globalConstraints)
 
-  const playlistSequence = config.sequence
-    .map(playlist => {
-      return {
-        name: playlist.name,
-        fillOrder: isNaN(playlist.fillOrder) ? null : playlist.fillOrder,
-        constraints: realiseConstraints(now, playlist.constraints)
-      }
-    })
-
-  let counter = playlistSequence
-    .map(p => p.fillOrder)
-    .filter(o => o != null)
-    .reduce((a, b) => Math.max(a, b), 0)
-  playlistSequence.forEach(p => {
-    if (p.fillOrder === null) p.fillOrder = ++counter
-  })
-
-  console.log(playlistSequence)
+  const sequence = realisePlaylists(now, config.sequence)
 
   // source tracks for maxlength
   // sequence the tracks
   // return tracks
 
-  const trackList = sequencePlaylists(playlists, maxLength)
+  const trackList = sequencePlaylists(sequence, globalConstraints.runtime)
   return trackList
 }
 
@@ -123,6 +96,30 @@ function realiseConstraints (now, constraints) {
   })
 
   return realised
+}
+
+function realisePlaylists (now, playlists) {
+  const sequence = config.sequence
+    .map((playlist, index) => {
+      return {
+        name: playlist.name,
+        playOrder: index,
+        fillOrder: isNaN(playlist.fillOrder) ? null : playlist.fillOrder,
+        constraints: realiseConstraints(now, playlist.constraints),
+        trackSource: playlist.name === 'Gospels' ? long : short
+      }
+    })
+
+  let counter = sequence
+    .map(p => p.fillOrder)
+    .filter(o => o != null)
+    .reduce((a, b) => Math.max(a, b), 0)
+  sequence.forEach(p => {
+    if (p.fillOrder === null) p.fillOrder = ++counter
+  })
+  sequence.sort((a, b) => a.fillOrder < b.fillOrder ? -1 : 1)
+
+  return sequence
 }
 
 function * short () {
