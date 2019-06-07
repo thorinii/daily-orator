@@ -1,3 +1,4 @@
+const jodatime = require('js-joda')
 const sequencePlaylists = require('./sequencer')
 
 const config = {
@@ -30,10 +31,9 @@ const config = {
     }
   },
 
-  schedule: [
+  sequence: [
     {
       name: 'Gospels',
-      fillOrder: 1,
       constraints: {
         'Friday': {
           count: 0
@@ -52,7 +52,6 @@ const config = {
     },
     {
       name: 'History',
-      fillOrder: 2,
       constraints: {
         length: 12
       }
@@ -61,6 +60,12 @@ const config = {
 }
 
 function main () {
+  const now = jodatime.LocalDateTime.now()
+  const trackList = scheduleTracks(now, config)
+  console.log(trackList)
+}
+
+function scheduleTracks (now, config) {
   const maxLength = 37
   const playlists = [
     { name: 'Greek', playOrder: 1, length: 10, count: 1, trackSource: short },
@@ -68,21 +73,49 @@ function main () {
     { name: 'History', playOrder: 2, length: 12, trackSource: long }
   ]
 
-  // do playlist filtering before sequencing
-  const trackList = sequencePlaylists(playlists, maxLength)
+  const globalConstraints = realiseConstraints(now, config.globalConstraints)
 
-  console.log(trackList)
-}
+  // realise playlists, constraints, and fill orders
+  const playlistSequence = config.sequence.map(playlist => {
+    return {
+      name: playlist.name,
+      fillOrder: playlist.fillOrder >= 0 ? playlist.fillOrder : null,
+      constraints: realiseConstraints(now, playlist.constraints)
+    }
+  })
+  // set null fill orders
+  console.log(playlistSequence)
 
-function scheduleTracks () {
-  // realise global constraints
-  // realise playlists and constraints
   // source tracks for maxlength
   // sequence the tracks
   // return tracks
+
+  const trackList = sequencePlaylists(playlists, maxLength)
+  return trackList
 }
 
-function realiseConstraints (now, constraints) {}
+function realiseConstraints (now, constraints) {
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const realised = {}
+
+  Object.keys(constraints).filter(k => !daysOfWeek.includes(k)).forEach(key => {
+    realised[key] = constraints[key]
+  })
+
+  const dayId = daysOfWeek[now.dayOfWeek().ordinal()]
+  if (dayId in constraints) {
+    const dayConstraints = constraints[dayId]
+    Object.keys(dayConstraints).forEach(key => {
+      realised[key] = dayConstraints[key]
+    })
+  }
+
+  Object.keys(realised).forEach(key => {
+    if (realised[key] === null) delete realised[key]
+  })
+
+  return realised
+}
 
 function * short () {
   // dummy implementation
