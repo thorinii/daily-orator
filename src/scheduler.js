@@ -1,14 +1,15 @@
 const jodatime = require('js-joda')
+const zipWith = require('lodash/zipWith')
 const sequencePlaylists = require('./sequencer')
 
 const config = {
   playlists: {
     'Gospels': {
-      provider: 'file',
+      provider: 'esv',
       prologue: '30s'
     },
     'Greek': {
-      provider: 'esv',
+      provider: 'file',
       prologue: false
     },
     'History': {
@@ -50,29 +51,35 @@ const config = {
     {
       name: 'History',
       constraints: {
-        length: 12
+        runtime: 12
       }
     }
   ]
 }
 
-function main () {
+async function main () {
   const now = jodatime.LocalDateTime.now()
-  const trackList = scheduleTracks(now, config)
+  const providers = {
+    'esv': {
+      sourceTracks: async () => { await delay(400); return long }
+    },
+
+    'file': {
+      sourceTracks: async () => { await delay(100); return short }
+    }
+  }
+
+  const trackList = await scheduleTracks(now, config, providers)
   console.log(trackList)
 }
 
-function scheduleTracks (now, config) {
+async function scheduleTracks (now, config, providers) {
   const globalConstraints = realiseConstraints(now, config.globalConstraints)
 
   const sequence = realisePlaylists(now, config.sequence)
+  await loadTrackGenerators(sequence, providers, globalConstraints.runtime)
 
-  // source tracks for maxlength
-  // sequence the tracks
-  // return tracks
-
-  const trackList = sequencePlaylists(sequence, globalConstraints.runtime)
-  return trackList
+  return sequencePlaylists(sequence, globalConstraints.runtime)
 }
 
 function realiseConstraints (now, constraints) {
@@ -106,7 +113,7 @@ function realisePlaylists (now, playlists) {
         playOrder: index,
         fillOrder: isNaN(playlist.fillOrder) ? null : playlist.fillOrder,
         constraints: realiseConstraints(now, playlist.constraints),
-        trackSource: playlist.name === 'Gospels' ? long : short
+        trackSource: null
       }
     })
 
@@ -120,6 +127,22 @@ function realisePlaylists (now, playlists) {
   sequence.sort((a, b) => a.fillOrder < b.fillOrder ? -1 : 1)
 
   return sequence
+}
+
+async function loadTrackGenerators (playlists, providers, runtime) {
+  const sourcingPromises = playlists.map(playlist => {
+    const playlistConfig = config.playlists[playlist.name]
+    const provider = providers[playlistConfig.provider]
+    return provider.sourceTracks(playlistConfig, runtime)
+  })
+  zipWith(
+    (await Promise.all(sourcingPromises)),
+    playlists,
+    (generatorFn, playlist) => (playlist.trackSource = generatorFn))
+}
+
+function delay (ms) {
+  return new Promise((resolve, reject) => setTimeout(() => resolve(), ms))
 }
 
 function * short () {
@@ -148,4 +171,4 @@ function * long () {
   }
 }
 
-main()
+main().then(null, e => console.error('crash', e))
