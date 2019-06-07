@@ -1,8 +1,8 @@
 function sequencePlaylists (playlists, maxLength) {
   const filledPlaylists = playlists.map(p => ({
     playOrder: p.playOrder,
-    countLimit: p.constraints.count || Infinity,
-    runtimeLimit: p.constraints.runtime || Infinity,
+    countLimit: orNull(p.constraints.count, Infinity),
+    runtimeLimit: orNull(p.constraints.runtime, Infinity),
     tracks: [],
     generator: p.trackSource()
   }))
@@ -56,6 +56,10 @@ function sequencePlaylists (playlists, maxLength) {
 
 function len (tracks) {
   return tracks.reduce((acc, t) => acc + t.length, 0)
+}
+
+function orNull (value, def) {
+  return value === null || value === undefined ? def : value
 }
 
 module.exports = sequencePlaylists
