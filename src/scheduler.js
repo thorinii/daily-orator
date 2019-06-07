@@ -75,15 +75,23 @@ function scheduleTracks (now, config) {
 
   const globalConstraints = realiseConstraints(now, config.globalConstraints)
 
-  // realise playlists, constraints, and fill orders
-  const playlistSequence = config.sequence.map(playlist => {
-    return {
-      name: playlist.name,
-      fillOrder: playlist.fillOrder >= 0 ? playlist.fillOrder : null,
-      constraints: realiseConstraints(now, playlist.constraints)
-    }
+  const playlistSequence = config.sequence
+    .map(playlist => {
+      return {
+        name: playlist.name,
+        fillOrder: isNaN(playlist.fillOrder) ? null : playlist.fillOrder,
+        constraints: realiseConstraints(now, playlist.constraints)
+      }
+    })
+
+  let counter = playlistSequence
+    .map(p => p.fillOrder)
+    .filter(o => o != null)
+    .reduce((a, b) => Math.max(a, b), 0)
+  playlistSequence.forEach(p => {
+    if (p.fillOrder === null) p.fillOrder = ++counter
   })
-  // set null fill orders
+
   console.log(playlistSequence)
 
   // source tracks for maxlength
