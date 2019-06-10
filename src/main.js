@@ -1,5 +1,3 @@
-const jodatime = require('js-joda')
-
 const Cron = require('./cron')
 const scheduleTracks = require('./scheduler')
 
@@ -87,9 +85,11 @@ async function scheduleDayTracklist (config, providers, now) {
 
   try {
     console.log('scheduling')
+    // TODO: load pointers
     const trackList = await scheduleTracks(now, config, providers)
     console.log(trackList)
 
+    // TODO: make required audio
     // TODO: add to RSS
     // TODO: update pointers
   } catch (e) {

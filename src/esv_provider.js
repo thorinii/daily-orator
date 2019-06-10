@@ -6,11 +6,7 @@ const { promisify } = require('util')
 const Bottleneck = require('bottleneck')
 const request = require('request')
 
-const { joinAudioFiles, transcodeAudioToVideo, skipIfExists } = require('./utils')
-
-const dataDirectory = path.join(__dirname, '..', 'data')
-const audioCacheDirectory = path.join(dataDirectory, 'esv_cache')
-const sweepAgeDays = process.env.SWEEP_AGE_DAYS || 2
+const { joinAudioFiles } = require('./utils')
 
 const bookChapterCounts = {
   'Genesis': 50,
@@ -154,6 +150,10 @@ function rangeUntil (count) {
 
 module.exports = {
   name: 'esv',
+
+  getTrackRefs (listConfig) {
+    return generateChaptersForList(listConfig.books)
+  },
 
   async createList (config, listConfig) {
     return {
