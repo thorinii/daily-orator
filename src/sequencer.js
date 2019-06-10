@@ -1,22 +1,26 @@
+const jodatime = require('js-joda')
+
 function sequencePlaylists (playlists, maxLength) {
+  maxLength = jodatime.Duration.ofMinutes(maxLength)
+
   const filledPlaylists = playlists.map(p => ({
     playOrder: p.playOrder,
     countLimit: orNull(p.constraints.count, Infinity),
-    runtimeLimit: orNull(p.constraints.runtime, Infinity),
+    runtimeLimit: jodatime.Duration.ofMinutes(orNull(p.constraints.runtime, 100)),
     tracks: [],
     generator: p.trackSource()
   }))
 
   // iterate through each playlist and try add at least one non-prologue track
 
-  let totalLength = 0
+  let totalLength = jodatime.Duration.ZERO
   let addedTracks
   do {
     addedTracks = false
 
     filledPlaylists.forEach(playlist => {
       const countLimit = playlist.countLimit
-      const runtimeLimit = playlist.runtimeLimit
+      const runtimeLimit = playlist.runtimeLimit || maxLength
       const uncommitted = []
 
       let hasCommitted = false
@@ -24,8 +28,8 @@ function sequencePlaylists (playlists, maxLength) {
         let { value: track, done } = playlist.generator.next()
         if (done) break
         if (playlist.tracks.length >= countLimit) break
-        if (len(playlist.tracks) + track.length > runtimeLimit) break
-        if (len(uncommitted) + track.length + totalLength > maxLength) break
+        if (len(playlist.tracks).plus(track.length) > runtimeLimit) break
+        if (len(uncommitted).plus(track.length).plus(totalLength) > maxLength) break
 
         uncommitted.push(track)
 
@@ -39,7 +43,7 @@ function sequencePlaylists (playlists, maxLength) {
 
       if (hasCommitted) {
         playlist.tracks = [...playlist.tracks, ...uncommitted]
-        totalLength += len(uncommitted)
+        totalLength = totalLength.plus(len(uncommitted))
         addedTracks = true
       }
     })
@@ -55,7 +59,7 @@ function sequencePlaylists (playlists, maxLength) {
 }
 
 function len (tracks) {
-  return tracks.reduce((acc, t) => acc + t.length, 0)
+  return tracks.reduce((acc, t) => acc.plus(t.length), jodatime.Duration.ZERO)
 }
 
 function orNull (value, def) {
