@@ -20,14 +20,16 @@ class Cron {
     this.intervalId = setInterval(() => {
       this._tick()
     }, this.cronInterval)
+
+    setTimeout(() => this._tick())
   }
 
-  _tick () {
+  async _tick () {
     const now = jodatime.ZonedDateTime.now(this.tz)
 
     for (const fn of this.fns) {
       try {
-        fn.fn(now)
+        await fn.fn(now)
       } catch (e) {
         console.warn('Failed to execute cron function:', e)
       }
@@ -42,9 +44,5 @@ class Cron {
     return jodatime.ZoneId.of(id)
   }
 }
-
-new Cron(Cron.zoneId('Australia/Adelaide'), 1000)
-  .schedule(() => console.log('yo'))
-  .start()
 
 module.exports = Cron

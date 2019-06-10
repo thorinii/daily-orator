@@ -1,7 +1,12 @@
 const jodatime = require('js-joda')
+
+const Cron = require('./cron')
 const scheduleTracks = require('./scheduler')
 
 const config = {
+  timezone: 'Australia/Adelaide',
+  cronIntervalMs: 3000,
+
   playlists: {
     'Gospels': {
       provider: 'esv',
@@ -57,47 +62,73 @@ const config = {
 }
 
 async function main () {
-  const now = jodatime.LocalDateTime.now()
+  // TODO: load config
   const providers = {
     'esv': {
-      sourceTracks: async () => { await delay(400); return long }
+      sourceTracks: async (name) => { await delay(400); return long(name) }
     },
 
     'file': {
-      sourceTracks: async () => { await delay(100); return short }
+      sourceTracks: async (name) => { await delay(100); return short(name) }
     }
   }
 
-  const trackList = await scheduleTracks(now, config, providers)
-  console.log(trackList)
+  const cron = new Cron(
+    Cron.zoneId(config.timezone),
+    config.cronIntervalMs)
+
+  cron.schedule(now => scheduleDayTracklist(config, providers, now))
+  cron.schedule(() => cleanCache())
+  cron.start()
+}
+
+async function scheduleDayTracklist (config, providers, now) {
+  // TODO: if a new day since last items in feed
+
+  try {
+    console.log('scheduling')
+    const trackList = await scheduleTracks(now, config, providers)
+    console.log(trackList)
+
+    // TODO: add to RSS
+    // TODO: update pointers
+  } catch (e) {
+    console.warn('Error scheduling tracks:', e)
+  }
+}
+
+function cleanCache () {
+  console.log('cleaning')
+  // TODO: freshen all tracks required by feed
+  // TODO: remove items not fresh
 }
 
 function delay (ms) {
   return new Promise((resolve, reject) => setTimeout(() => resolve(), ms))
 }
 
-function * short () {
+const short = name => function * short () {
   // dummy implementation
   const trackLength = 3.37
 
   let index = 0
   while (true) {
-    yield { prologue: false, length: trackLength, index, list: 'short' }
+    yield { prologue: false, length: trackLength, index, list: name }
     index++
   }
 }
 
-function * long () {
+const long = name => function * long () {
   // dummy implementation
   const trackLength = 7.3
 
   let index = 0
 
-  yield { prologue: true, length: 1.1, index, list: 'long' }
+  yield { prologue: true, length: 1.1, index, list: name }
   index++
 
   while (true) {
-    yield { prologue: false, length: trackLength, index, list: 'long' }
+    yield { prologue: false, length: trackLength, index, list: name }
     index++
   }
 }
