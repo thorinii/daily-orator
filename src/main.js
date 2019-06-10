@@ -3,20 +3,23 @@ const scheduleTracks = require('./scheduler')
 
 const config = {
   timezone: 'Australia/Adelaide',
-  cronIntervalMs: 3000,
+  cronIntervalMs: 7000,
 
   playlists: {
     'Gospels': {
       provider: 'esv',
-      prologue: '30s'
+      prologue: '30s',
+      books: ['Matthew', 'Mark', 'Luke', 'John']
     },
     'Greek': {
       provider: 'file',
-      prologue: false
+      prologue: false,
+      files: []
     },
     'History': {
       provider: 'esv',
-      prologue: '30s'
+      prologue: '30s',
+      books: ['Genesis']
     }
   },
 
@@ -53,7 +56,7 @@ const config = {
     {
       name: 'History',
       constraints: {
-        runtime: 12
+        runtime: 17
       }
     }
   ]
@@ -63,11 +66,15 @@ async function main () {
   // TODO: load config
   const providers = {
     'esv': {
-      sourceTracks: async (name) => { await delay(400); return long(name) }
+      impl: require('./esv_provider'),
+      config: {
+        api_key: '951dadccfb10693cf56fd5604814a65766d84214'
+      }
     },
 
     'file': {
-      sourceTracks: async (name) => { await delay(100); return short(name) }
+      impl: require('./file_provider'),
+      config: {}
     }
   }
 
@@ -86,7 +93,7 @@ async function scheduleDayTracklist (config, providers, now) {
   try {
     console.log('scheduling')
     // TODO: load pointers
-    const trackList = await scheduleTracks(now, config, providers)
+    const trackList = await scheduleTracks(now, config, providers, {})
     console.log(trackList)
 
     // TODO: make required audio
@@ -101,36 +108,6 @@ function cleanCache () {
   console.log('cleaning')
   // TODO: freshen all tracks required by feed
   // TODO: remove items not fresh
-}
-
-function delay (ms) {
-  return new Promise((resolve, reject) => setTimeout(() => resolve(), ms))
-}
-
-const short = name => function * short () {
-  // dummy implementation
-  const trackLength = 3.37
-
-  let index = 0
-  while (true) {
-    yield { prologue: false, length: trackLength, index, list: name }
-    index++
-  }
-}
-
-const long = name => function * long () {
-  // dummy implementation
-  const trackLength = 7.3
-
-  let index = 0
-
-  yield { prologue: true, length: 1.1, index, list: name }
-  index++
-
-  while (true) {
-    yield { prologue: false, length: trackLength, index, list: name }
-    index++
-  }
 }
 
 main().then(null, e => console.error('crash', e))

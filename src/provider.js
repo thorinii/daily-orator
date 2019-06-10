@@ -13,22 +13,24 @@ const tmpPath = path.join(dataPath, 'tmp')
 
 const fileCache = new FileCache(audioCachePath, 2)
 
-function getAudioFile (provider, providerConfig, ref) {
-  const key = provider.name + ':' + ref
+function getAudioFile (provider, ref) {
+  const key = provider.impl.name + ':' + ref
   return fileCache.get(key, 'mp3', async (destination) => {
     const tempSource = new TempFileSource(tmpPath)
-    const audioPath = await provider.getAudioTempFile(providerConfig, ref, tempSource)
+    const audioPath = await provider.impl.getAudioTempFile(provider.config, ref, tempSource)
     await rename(audioPath, destination)
     await tempSource.cleanup()
   })
 }
 
-async function createTrackGenerator (provider, providerConfig, playlistName, playlistConfig, runtime, pointer) {
+async function createTrackGenerator (provider, playlistName, playlistConfig, runtime, pointer) {
   if (pointer === null) return arrayGenerator([])
+  runtime = jodatime.Duration.ofMinutes(runtime)
 
-  const refs = await provider.getTrackRefs(playlistConfig)
+  const refs = await provider.impl.getTrackRefs(playlistConfig)
+  if (refs.length === 0) return arrayGenerator([])
 
-  const pointerIndex = refs.indexOf(pointer) || 0
+  const pointerIndex = Math.max(0, refs.indexOf(pointer) || 0)
 
   const tracks = []
   let accumulatedRuntime = jodatime.Duration.ZERO
@@ -36,11 +38,11 @@ async function createTrackGenerator (provider, providerConfig, playlistName, pla
   do {
     const ref = refs[index]
 
-    const audioPath = await getAudioFile(provider, providerConfig, ref)
+    const audioPath = await getAudioFile(provider, ref)
     const length = await getAudioLength(audioPath)
 
     tracks.push({
-      provider: provider.name,
+      provider: provider.impl.name,
       playlist: playlistName,
       prologue: false,
       length: length,
@@ -58,30 +60,13 @@ async function createTrackGenerator (provider, providerConfig, playlistName, pla
   return arrayGenerator(tracks)
 }
 
-function * arrayGenerator (array) {
-  for (const item of array) {
-    yield item
+function arrayGenerator (array) {
+  return function * () {
+    for (const item of array) {
+      yield item
+    }
   }
 }
-
-;(async function () {
-  const provider = require('./esv_provider')
-  const listName = 'Letters'
-  const listConfig = {
-    repeat: true,
-    books: ['Galatians', 'Ephesians']
-  }
-  const pointer = 'Ephesians 2'
-  const runtime = jodatime.Duration.ofMinutes(10)
-
-  const tracks = await createTrackGenerator(
-    provider,
-    { api_key: '951dadccfb10693cf56fd5604814a65766d84214' },
-    listName, listConfig,
-    runtime, pointer)
-
-  console.log([...tracks])
-})().then(null, e => console.error('crash', e))
 
 module.exports = {
   createTrackGenerator

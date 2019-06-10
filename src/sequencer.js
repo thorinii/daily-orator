@@ -28,8 +28,8 @@ function sequencePlaylists (playlists, maxLength) {
         let { value: track, done } = playlist.generator.next()
         if (done) break
         if (playlist.tracks.length >= countLimit) break
-        if (len(playlist.tracks).plus(track.length) > runtimeLimit) break
-        if (len(uncommitted).plus(track.length).plus(totalLength) > maxLength) break
+        if (len(playlist.tracks).plus(track.length).compareTo(runtimeLimit) > 0) break
+        if (len(uncommitted).plus(track.length).plus(totalLength).compareTo(maxLength) > 0) break
 
         uncommitted.push(track)
 

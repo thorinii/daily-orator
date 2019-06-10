@@ -1,13 +1,14 @@
 const zipWith = require('lodash/zipWith')
+const { createTrackGenerator } = require('./provider')
 const sequencePlaylists = require('./sequencer')
 
-async function scheduleTracks (now, config, providers) {
+async function scheduleTracks (now, config, providers, pointers) {
   const globalConstraints = realiseConstraints(now, config.globalConstraints)
   if (globalConstraints.count === 0) return []
   if (globalConstraints.runtime === 0) return []
 
   const sequence = realisePlaylists(now, config.sequence)
-  await loadTrackGenerators(sequence, config.playlists, providers, globalConstraints.runtime)
+  await loadTrackGenerators(sequence, config.playlists, providers, pointers, globalConstraints.runtime)
 
   return sequencePlaylists(sequence, globalConstraints.runtime)
 }
@@ -59,11 +60,12 @@ function realisePlaylists (now, playlists) {
   return sequence
 }
 
-async function loadTrackGenerators (playlists, playlistConfigs, providers, runtime) {
+async function loadTrackGenerators (playlists, playlistConfigs, providers, pointers, runtime) {
   const sourcingPromises = playlists.map(playlist => {
     const playlistConfig = playlistConfigs[playlist.name]
     const provider = providers[playlistConfig.provider]
-    return provider.sourceTracks(playlist.name, playlistConfig, runtime)
+    const pointer = pointers[playlist.name]
+    return createTrackGenerator(provider, playlist.name, playlistConfig, runtime, pointer)
   })
   zipWith(
     (await Promise.all(sourcingPromises)),

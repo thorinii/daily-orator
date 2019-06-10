@@ -9,6 +9,14 @@ const audioPath = path.join(dataPath, 'file_audio')
 module.exports = {
   name: 'file',
 
+  async getTrackRefs (listConfig) {
+    return [].concat(...(await Promise.all(listConfig.files.map(g => {
+      return promisify(glob)(g, {
+        cwd: audioPath
+      })
+    }))))
+  },
+
   async createList (config, listConfig) {
     return {
       files: [].concat(...(await Promise.all(listConfig.files.map(g => {
