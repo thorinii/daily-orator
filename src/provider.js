@@ -24,18 +24,24 @@ function getAudioFile (provider, ref) {
 }
 
 async function createTrackGenerator (provider, playlistName, playlistConfig, runtime, pointer) {
-  if (pointer === null) return arrayGenerator([])
   runtime = jodatime.Duration.ofMinutes(runtime)
 
   const refs = await provider.impl.getTrackRefs(playlistConfig)
   if (refs.length === 0) return arrayGenerator([])
 
-  const pointerIndex = Math.max(0, refs.indexOf(pointer) || 0)
+  let pointerIndex
+  if (pointer === null) {
+    if (playlistConfig.repeat) pointerIndex = 0
+    else return arrayGenerator([])
+  } else {
+    pointerIndex = Math.max(0, refs.indexOf(pointer) || 0)
+  }
 
   const tracks = []
   let accumulatedRuntime = jodatime.Duration.ZERO
   let index = pointerIndex
   do {
+    // TODO: handle session breakpoints
     const ref = refs[index]
 
     const audioPath = await getAudioFile(provider, ref)
@@ -61,6 +67,7 @@ async function createTrackGenerator (provider, playlistName, playlistConfig, run
 }
 
 function arrayGenerator (array) {
+  // TODO: prologues
   return function * () {
     for (const item of array) {
       yield item

@@ -64,7 +64,7 @@ async function loadTrackGenerators (playlists, playlistConfigs, providers, point
   const sourcingPromises = playlists.map(playlist => {
     const playlistConfig = playlistConfigs[playlist.name]
     const provider = providers[playlistConfig.provider]
-    const pointer = pointers[playlist.name]
+    const pointer = pointers.get(playlist.name)
     return createTrackGenerator(provider, playlist.name, playlistConfig, runtime, pointer)
   })
   zipWith(

@@ -1,5 +1,38 @@
+const fsJsonStore = require('fs-json-store')
+const path = require('path')
+
 const Cron = require('./cron')
 const scheduleTracks = require('./scheduler')
+
+class Pointers {
+  static async load (filePath) {
+    const store = new fsJsonStore.Store({
+      file: filePath
+    })
+    const map = await store.read() || {}
+    return new Pointers(store, map)
+  }
+
+  constructor (store, map) {
+    this.store = store
+    this.map = map
+  }
+
+  get (key) {
+    return this.map[key] || null
+  }
+
+  set (key, value) {
+    this.map[key] = value
+  }
+
+  async save () {
+    await this.store.write(this.map)
+  }
+}
+
+const dataPath = path.join(__dirname, '../data')
+const pointersFilePath = path.join(dataPath, 'pointers.json')
 
 const config = {
   timezone: 'Australia/Adelaide',
@@ -9,17 +42,20 @@ const config = {
     'Gospels': {
       provider: 'esv',
       prologue: '30s',
-      books: ['Matthew', 'Mark', 'Luke', 'John']
+      books: ['Matthew', 'Mark', 'Luke', 'John'],
+      repeat: true
     },
     'Greek': {
       provider: 'file',
       prologue: false,
-      files: []
+      files: [],
+      repeat: true
     },
     'History': {
       provider: 'esv',
       prologue: '30s',
-      books: ['Genesis']
+      books: ['Genesis'],
+      repeat: true
     }
   },
 
@@ -92,9 +128,9 @@ async function scheduleDayTracklist (config, providers, now) {
 
   try {
     console.log('scheduling')
-    // TODO: load pointers
-    const trackList = await scheduleTracks(now, config, providers, {})
-    console.log(trackList)
+    const pointers = await Pointers.load(pointersFilePath)
+    const trackList = await scheduleTracks(now, config, providers, pointers)
+    console.log('tracklist:', trackList)
 
     // TODO: make required audio
     // TODO: add to RSS
