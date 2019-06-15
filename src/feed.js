@@ -2,6 +2,7 @@ const path = require('path')
 const { URL } = require('url')
 
 const fsJsonStore = require('fs-json-store')
+const jodatime = require('js-joda')
 const RSS = require('rss')
 const md5 = require('md5')
 
@@ -63,6 +64,13 @@ async function addItem (dataPath, url, title, timestamp = null) {
   await store.write(feed)
 }
 
+async function getDateOfLastItem (dataPath) {
+  const feedItems = await readFeed(dataPath)
+  if (feedItems.length === 0) return null
+
+  return jodatime.Instant.parse(feedItems.map(i => i.timestamp).sort().reverse()[0])
+}
+
 function makeStore (dataPath) {
   return new fsJsonStore.Store({
     file: path.join(dataPath, 'feed.json')
@@ -72,5 +80,6 @@ function makeStore (dataPath) {
 module.exports = {
   readFeed,
   addItem,
+  getDateOfLastItem,
   generateRss
 }

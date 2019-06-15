@@ -1,11 +1,12 @@
 const fsJsonStore = require('fs-json-store')
-const path = require('path')
 const groupBy = require('lodash/groupBy')
+const jodatime = require('js-joda')
+const path = require('path')
 
 const Cron = require('./cron')
 const scheduleTracks = require('./scheduler')
 const { getAudioFile, getNextAfter } = require('./provider')
-const { addItem } = require('./feed')
+const { addItem, getDateOfLastItem } = require('./feed')
 
 class Pointers {
   static async load (filePath) {
@@ -127,7 +128,9 @@ async function main () {
 }
 
 async function scheduleDayTracklist (config, providers, now) {
-  // TODO: if a new day since last items in feed
+  const todayStart = now.truncatedTo(jodatime.ChronoUnit.DAYS).toInstant()
+  const lastItemTimestamp = await getDateOfLastItem(dataPath)
+  if (lastItemTimestamp && lastItemTimestamp.isAfter(todayStart)) return
 
   try {
     console.log('scheduling')
