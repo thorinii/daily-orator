@@ -138,4 +138,4 @@ function delay (ms) {
   return new Promise(resolve => setTimeout(() => resolve(), ms))
 }
 
-main().then(null, e => console.error('crash', e))
+module.exports = main
