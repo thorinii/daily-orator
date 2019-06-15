@@ -4,6 +4,7 @@ const path = require('path')
 const Cron = require('./cron')
 const scheduleTracks = require('./scheduler')
 const { getAudioFile } = require('./provider')
+const { addItem } = require('./feed')
 
 class Pointers {
   static async load (filePath) {
@@ -135,7 +136,8 @@ async function scheduleDayTracklist (config, providers, now) {
 
     await cacheRequiredAudio(providers, trackList)
 
-    // TODO: add to RSS
+    await addToFeed(trackList)
+
     // TODO: update pointers
   } catch (e) {
     console.warn('Error scheduling tracks:', e)
@@ -153,6 +155,14 @@ async function cacheRequiredAudio (providers, tracks) {
     const provider = providers[track.provider]
     await getAudioFile(provider, track.ref, track.prologue)
   }))
+}
+
+async function addToFeed (tracks) {
+  for (const track of tracks) {
+    const ref = encodeURIComponent(track.ref)
+    const url = `audio/${track.provider}/${ref}?prologue=${track.prologue}`
+    await addItem(dataPath, url, track.ref + (track.prologue ? ' (prologue)' : ''))
+  }
 }
 
 main().then(null, e => console.error('crash', e))

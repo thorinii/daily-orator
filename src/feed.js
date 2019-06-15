@@ -28,7 +28,7 @@ async function generateRss (dataPath) {
     feed.item({
       title: item.title,
       description: item.title + ' (' + item.url + ')',
-      url: item.url,
+      url: new URL(item.url, FEED_SITE_URL).toString(),
       guid: md5(item.url + item.timestamp),
       date: item.timestamp,
       enclosure: {
@@ -68,15 +68,6 @@ function makeStore (dataPath) {
     file: path.join(dataPath, 'feed.json')
   })
 }
-
-(async function () {
-  const dataPath = path.join(__dirname, '../data')
-  console.log('adding item')
-  await addItem(dataPath, FEED_SITE_URL + 'audio/thing.mp3', 'A thing')
-  await addItem(dataPath, FEED_SITE_URL + 'audio/thing2.mp3', 'Another thing')
-
-  console.log('feed', await readFeed(dataPath))
-})().then(null, e => console.log('error', e))
 
 module.exports = {
   readFeed,
