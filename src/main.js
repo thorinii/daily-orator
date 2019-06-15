@@ -3,6 +3,7 @@ const path = require('path')
 
 const Cron = require('./cron')
 const scheduleTracks = require('./scheduler')
+const { getAudioFile } = require('./provider')
 
 class Pointers {
   static async load (filePath) {
@@ -132,7 +133,8 @@ async function scheduleDayTracklist (config, providers, now) {
     const trackList = await scheduleTracks(now, config, providers, pointers)
     console.log('tracklist:', trackList)
 
-    // TODO: make required audio
+    await cacheRequiredAudio(providers, trackList)
+
     // TODO: add to RSS
     // TODO: update pointers
   } catch (e) {
@@ -144,6 +146,13 @@ function cleanCache () {
   console.log('cleaning')
   // TODO: freshen all tracks required by feed
   // TODO: remove items not fresh
+}
+
+async function cacheRequiredAudio (providers, tracks) {
+  await Promise.all(tracks.map(async track => {
+    const provider = providers[track.provider]
+    await getAudioFile(provider, track.ref, track.prologue)
+  }))
 }
 
 main().then(null, e => console.error('crash', e))

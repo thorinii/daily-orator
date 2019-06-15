@@ -13,7 +13,7 @@ const tmpPath = path.join(dataPath, 'tmp')
 
 const fileCache = new FileCache(audioCachePath, 2)
 
-function getAudioFile (provider, ref) {
+function getAudioFile (provider, ref, prologue) {
   const key = provider.impl.name + ':' + ref
   return fileCache.get(key, 'mp3', async (destination) => {
     const tempSource = new TempFileSource(tmpPath)
@@ -76,5 +76,6 @@ function arrayGenerator (array) {
 }
 
 module.exports = {
-  createTrackGenerator
+  createTrackGenerator,
+  getAudioFile
 }
