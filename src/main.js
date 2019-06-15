@@ -7,6 +7,7 @@ const Cron = require('./cron')
 const scheduleTracks = require('./scheduler')
 const { getAudioFile, getNextAfter } = require('./provider')
 const { addItem, getDateOfLastItem } = require('./feed')
+const startServer = require('./api')
 
 class Pointers {
   static async load (filePath) {
@@ -60,6 +61,8 @@ async function main () {
   cron.schedule(now => scheduleDayTracklist(config, providers, now))
   cron.schedule(() => cleanCache())
   cron.start()
+
+  startServer(config, providers, dataPath)
 }
 
 async function scheduleDayTracklist (config, providers, now) {

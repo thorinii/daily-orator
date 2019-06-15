@@ -33,7 +33,7 @@ async function generateRss (dataPath) {
       guid: md5(item.url + item.timestamp),
       date: item.timestamp,
       enclosure: {
-        url: item.url
+        url: new URL(item.url, FEED_SITE_URL).toString()
       }
     })
   })
