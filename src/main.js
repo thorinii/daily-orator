@@ -1,9 +1,10 @@
 const fsJsonStore = require('fs-json-store')
 const path = require('path')
+const groupBy = require('lodash/groupBy')
 
 const Cron = require('./cron')
 const scheduleTracks = require('./scheduler')
-const { getAudioFile } = require('./provider')
+const { getAudioFile, getNextAfter } = require('./provider')
 const { addItem } = require('./feed')
 
 class Pointers {
@@ -38,7 +39,7 @@ const pointersFilePath = path.join(dataPath, 'pointers.json')
 
 const config = {
   timezone: 'Australia/Adelaide',
-  cronIntervalMs: 7000,
+  cronIntervalMs: 60 * 1000,
 
   playlists: {
     'Gospels': {
@@ -132,13 +133,15 @@ async function scheduleDayTracklist (config, providers, now) {
     console.log('scheduling')
     const pointers = await Pointers.load(pointersFilePath)
     const trackList = await scheduleTracks(now, config, providers, pointers)
-    console.log('tracklist:', trackList)
+    console.log('tracklist:')
+    console.log(trackList.map(t => `${t.playlist}: [${t.provider}] ${t.ref} ${t.prologue ? '(prologue)' : ''}${t.length.toString()}`))
 
     await cacheRequiredAudio(providers, trackList)
 
     await addToFeed(trackList)
+    await updatePointers(config.playlists, providers, pointers, trackList)
 
-    // TODO: update pointers
+    console.log('published')
   } catch (e) {
     console.warn('Error scheduling tracks:', e)
   }
@@ -162,7 +165,29 @@ async function addToFeed (tracks) {
     const ref = encodeURIComponent(track.ref)
     const url = `audio/${track.provider}/${ref}?prologue=${track.prologue}`
     await addItem(dataPath, url, track.ref + (track.prologue ? ' (prologue)' : ''))
+    await delay(2000)
   }
+}
+
+async function updatePointers (playlistConfigs, providers, pointers, tracks) {
+  const tracksByList = groupBy(tracks, t => t.playlist)
+  for (const playlist in tracksByList) {
+    const playlistConfig = playlistConfigs[playlist]
+    const tracks = tracksByList[playlist].filter(t => !t.prologue)
+    const lastTrack = tracks[tracks.length - 1]
+
+    const providerId = lastTrack.provider
+    const provider = providers[providerId]
+
+    const nextRef = await getNextAfter(provider, playlistConfig, lastTrack.ref)
+    pointers.set(playlist, nextRef)
+  }
+
+  await pointers.save()
+}
+
+function delay (ms) {
+  return new Promise(resolve => setTimeout(() => resolve(), ms))
 }
 
 main().then(null, e => console.error('crash', e))

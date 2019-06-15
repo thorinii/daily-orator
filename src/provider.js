@@ -75,7 +75,19 @@ function arrayGenerator (array) {
   }
 }
 
+async function getNextAfter (provider, playlistConfig, ref) {
+  const refs = await provider.impl.getTrackRefs(playlistConfig)
+  if (refs.length === 0) return null
+
+  const index = Math.max(0, refs.indexOf(ref) || 0)
+  let nextIndex = index + 1
+  if (nextIndex >= refs.length) nextIndex = 0
+
+  return refs[nextIndex]
+}
+
 module.exports = {
   createTrackGenerator,
-  getAudioFile
+  getAudioFile,
+  getNextAfter
 }
