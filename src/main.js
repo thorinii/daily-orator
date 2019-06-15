@@ -71,15 +71,17 @@ async function scheduleDayTracklist (config, providers, now) {
   if (lastItemTimestamp && lastItemTimestamp.isAfter(todayStart)) return
 
   try {
-    console.log('scheduling')
+    console.log('scheduling', now.toString())
     const pointers = await Pointers.load(pointersFilePath)
     const trackList = await scheduleTracks(now, config, providers, pointers)
-    console.log('tracklist:')
-    console.log(trackList.map(t => `${t.playlist}: [${t.provider}] ${t.ref} ${t.prologue ? '(prologue)' : ''}${t.length.toString()}`))
 
+    console.log('caching audio')
     await cacheRequiredAudio(providers, trackList)
 
+    console.log('adding to feed')
     await addToFeed(trackList)
+
+    console.log('updating pointers')
     await updatePointers(config.playlists, providers, pointers, trackList)
 
     console.log('published')
@@ -89,7 +91,7 @@ async function scheduleDayTracklist (config, providers, now) {
 }
 
 function cleanCache () {
-  console.log('cleaning')
+  console.log('TODO: clean')
   // TODO: freshen all tracks required by feed
   // TODO: remove items not fresh
 }
@@ -102,11 +104,16 @@ async function cacheRequiredAudio (providers, tracks) {
 }
 
 async function addToFeed (tracks) {
+  let first = true
   for (const track of tracks) {
+    if (!first) await delay(2000)
+    first = false
+
     const ref = encodeURIComponent(track.ref)
     const url = `audio/${track.provider}/${ref}?prologue=${track.prologue}`
+
+    console.log(`publishing ${url}`)
     await addItem(dataPath, url, track.ref + (track.prologue ? ' (prologue)' : ''))
-    await delay(2000)
   }
 }
 
