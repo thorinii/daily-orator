@@ -47,11 +47,12 @@ async function readFeed (dataPath) {
 }
 
 async function addItem (dataPath, url, title) {
-  const minTimestamp = (await getDateOfLastItem(dataPath)).plus(MIN_RSS_GAP)
   const now = jodatime.Instant.now()
+  const lastItemTimestamp = await getDateOfLastItem(dataPath)
+  const minTimestamp = lastItemTimestamp === null ? now : lastItemTimestamp.plus(MIN_RSS_GAP)
 
   const item = {
-    timestamp: now.isAfter(minTimestamp) ? now : minTimestamp,
+    timestamp: minTimestamp.isBefore(now) ? now : minTimestamp,
     title,
     url
   }
