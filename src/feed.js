@@ -9,6 +9,7 @@ const md5 = require('md5')
 const FEED_NAME = process.env.FEED_NAME || 'Daily Orator'
 const FEED_SITE_URL = process.env.FEED_URL || 'http://localhost:3000/'
 const MAX_ITEMS = process.env.FEED_LENGTH || 100
+const MIN_RSS_GAP = jodatime.Duration.ofMinutes(process.env.MIN_RSS_GAP_MINUTES || 2)
 
 async function generateRss (dataPath) {
   const feedItems = await readFeed(dataPath)
@@ -19,8 +20,6 @@ async function generateRss (dataPath) {
     generator: 'Daily Orator',
     feed_url: new URL('feed', FEED_SITE_URL).toString(),
     site_url: FEED_SITE_URL,
-    managingEditor: 'Scheduled by Lachlan Phillips',
-    webMaster: 'Lachlan Phillips',
     language: 'en',
     ttl: 1 * 60 // minutes
   })
@@ -33,7 +32,8 @@ async function generateRss (dataPath) {
       guid: md5(item.url + item.timestamp),
       date: item.timestamp,
       enclosure: {
-        url: new URL(item.url, FEED_SITE_URL).toString()
+        url: new URL(item.url, FEED_SITE_URL).toString(),
+        type: 'audio/mpeg'
       }
     })
   })
@@ -46,9 +46,12 @@ async function readFeed (dataPath) {
   return (await store.read()) || []
 }
 
-async function addItem (dataPath, url, title, timestamp = null) {
+async function addItem (dataPath, url, title) {
+  const minTimestamp = (await getDateOfLastItem(dataPath)).plus(MIN_RSS_GAP)
+  const now = jodatime.Instant.now()
+
   const item = {
-    timestamp: timestamp || new Date().toISOString(),
+    timestamp: now.isAfter(minTimestamp) ? now : minTimestamp,
     title,
     url
   }

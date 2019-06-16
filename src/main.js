@@ -104,11 +104,7 @@ async function cacheRequiredAudio (providers, tracks) {
 }
 
 async function addToFeed (tracks) {
-  let first = true
   for (const track of tracks) {
-    if (!first) await delay(2000)
-    first = false
-
     const ref = encodeURIComponent(track.ref)
     const url = `audio/${track.provider}/${ref}?prologue=${track.prologue}`
 
@@ -132,10 +128,6 @@ async function updatePointers (playlistConfigs, providers, pointers, tracks) {
   }
 
   await pointers.save()
-}
-
-function delay (ms) {
-  return new Promise(resolve => setTimeout(() => resolve(), ms))
 }
 
 module.exports = main
