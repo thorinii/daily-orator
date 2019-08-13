@@ -25,14 +25,19 @@ async function generateRss (dataPath) {
   })
 
   feedItems.forEach(item => {
+    const guid = md5(item.url + item.timestamp)
+
+    const url = new URL(item.url, FEED_SITE_URL)
+    url.searchParams.set('unique', guid)
+
     feed.item({
       title: item.title,
       description: item.title + ' (' + item.url + ')',
-      url: new URL(item.url, FEED_SITE_URL).toString(),
-      guid: md5(item.url + item.timestamp),
+      url: url.toString(),
+      guid,
       date: item.timestamp,
       enclosure: {
-        url: new URL(item.url, FEED_SITE_URL).toString(),
+        url: url.toString(),
         type: 'audio/mpeg'
       }
     })

@@ -71,6 +71,7 @@ async function scheduleDayTracklist (config, providers, now) {
   if (lastItemTimestamp && lastItemTimestamp.isAfter(todayStart)) return
 
   try {
+    console.log('==========')
     console.log('scheduling', now.toString())
     const pointers = await Pointers.load(pointersFilePath)
     const trackList = await scheduleTracks(now, config, providers, pointers)
@@ -91,7 +92,7 @@ async function scheduleDayTracklist (config, providers, now) {
 }
 
 function cleanCache () {
-  console.log('TODO: clean')
+  // console.log('TODO: clean')
   // TODO: freshen all tracks required by feed
   // TODO: remove items not fresh
 }

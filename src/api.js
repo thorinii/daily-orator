@@ -25,7 +25,7 @@ module.exports = function startServer (config, providers, dataPath) {
 </html>`)
   })
 
-  app.get('/audio/:provider/:ref', (req, res, next) => {
+  app.get('/audio/:provider/:ref(*)', (req, res, next) => {
     const providerId = req.params.provider
     if (!providers[providerId]) {
       res.status(404)
@@ -33,7 +33,7 @@ module.exports = function startServer (config, providers, dataPath) {
     }
 
     const reference = req.params.ref
-    console.log('GET %s', req.url)
+    console.log('GET %s, %s: %s', req.url, providerId, reference)
 
     const provider = providers[providerId]
     getAudioFile(provider, reference, req.query.prologue === 'true')
